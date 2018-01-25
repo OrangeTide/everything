@@ -1,4 +1,6 @@
-/* nuklear - 1.32.0 - public domain */
+/* drv-gdi : GDI front-end GUI driver for APPS. public domain */
+/* ORIGINAL: nuklear_gdi.h
+ * nuklear - v1.32.0 - public domain */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
@@ -17,6 +19,7 @@
 #define NK_GDI_IMPLEMENTATION
 #include "nuklear.h"
 #include "nuklear_gdi.h"
+#include "app.h"
 
 /* ===============================================================
  *
@@ -27,28 +30,13 @@
  * done with this library. To try out an example uncomment the defines */
 /*#define INCLUDE_ALL */
 /*#define INCLUDE_STYLE */
-/*#define INCLUDE_CALCULATOR */
-/*#define INCLUDE_OVERVIEW */
-/*#define INCLUDE_NODE_EDITOR */
 
 #ifdef INCLUDE_ALL
   #define INCLUDE_STYLE
-  #define INCLUDE_CALCULATOR
-  #define INCLUDE_OVERVIEW
-  #define INCLUDE_NODE_EDITOR
 #endif
 
 #ifdef INCLUDE_STYLE
-  #include "../style.c"
-#endif
-#ifdef INCLUDE_CALCULATOR
-  #include "../calculator.c"
-#endif
-#ifdef INCLUDE_OVERVIEW
-  #include "../overview.c"
-#endif
-#ifdef INCLUDE_NODE_EDITOR
-  #include "../node_editor.c"
+  #include "style.c"
 #endif
 
 /* ===============================================================
@@ -116,6 +104,8 @@ int main(void)
     /*set_style(ctx, THEME_DARK);*/
     #endif
 
+    app_initialize(rect.right - rect.left, rect.bottom - rect.top);
+
     while (running)
     {
         /* Input */
@@ -160,22 +150,14 @@ int main(void)
         }
         nk_end(ctx);
 
-        /* -------------- EXAMPLES ---------------- */
-        #ifdef INCLUDE_CALCULATOR
-          calculator(ctx);
-        #endif
-        #ifdef INCLUDE_OVERVIEW
-          overview(ctx);
-        #endif
-        #ifdef INCLUDE_NODE_EDITOR
-          node_editor(ctx);
-        #endif
-        /* ----------------------------------------- */
-
+	/* Update the GUI apps */
+	app_paint(ctx);
+	
         /* Draw */
         nk_gdi_render(nk_rgb(30,30,30));
     }
-
+    
+    app_terminate();
     nk_gdifont_del(font);
     ReleaseDC(wnd, dc);
     UnregisterClassW(wc.lpszClassName, wc.hInstance);

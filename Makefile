@@ -11,13 +11,16 @@ CFLAGS+=-g
 
 # QUIET=N to show everything
 ifeq ($(QUIET),N)
-QUIET=""
+Q:=""
+else ifeq ($(QUIET),n)
+Q:=
 else ifneq ($(QUIET),@)
-QUIET=@
+Q:=@
 endif
 
 ifeq ($(OS),Windows_NT)
 # Windows
+LDFLAGS += -mwindows
 
 # Extension for executables
 X=.exe
@@ -43,7 +46,7 @@ else
 X=""
 
 # Definition for OS-specific variables
-OSDEF=windows
+OSDEF=linux
 
 # Libraries for mintaro
 MINTARO_LDLIBS=-lX11 -lXext -lasound -lpthread -lm
@@ -59,17 +62,17 @@ endif
 # Linking executables
 %$X : %.o
 	@echo Linking $@ ... $^
-	$(QUIET)$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(Q)$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 # Compiling executables
 %$X : %.c
 	@echo Compiling $@ ... $^
-	$(QUIET)$(LINK.c) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(Q)$(LINK.c) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 # Compiling objects
 %.o : %.c
 	@echo Compiling $@ ... $^
-	$(QUIET)$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(Q)$(COMPILE.c) $(OUTPUT_OPTION) $<
 
 # Pick up all targets
 include $(wildcard *.mk)

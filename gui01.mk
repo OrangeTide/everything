@@ -4,8 +4,8 @@ CFLAGS.gui01.windows =
 LDLIBS.gui01.windows = -lgdi32
 else
 OBJS.gui01.linux = drv_xlib.o
-CFLAGS.gui01.linux =
-LDLIBS.gui01.linux = -lX11
+CFLAGS.gui01.linux = $(shell pkg-config --cflags x11)
+LDLIBS.gui01.linux = $(shell pkg-config --libs x11)
 endif
 OBJS.gui01 = gui01.o
 EXEC.gui01 = gui01$X

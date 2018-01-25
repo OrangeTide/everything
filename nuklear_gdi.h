@@ -68,7 +68,7 @@ nk_create_image(struct nk_image * image, const char * frame_buffer, const int wi
         image->region[1] = 0;
         image->region[2] = width;
         image->region[3] = height;
-        
+
         INT row = ((width * 3 + 3) & ~3);
         BITMAPINFO bi = { 0 };
         bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -78,10 +78,10 @@ nk_create_image(struct nk_image * image, const char * frame_buffer, const int wi
         bi.bmiHeader.biBitCount = 24;
         bi.bmiHeader.biCompression = BI_RGB;
         bi.bmiHeader.biSizeImage = row * height;
-        
+
         LPBYTE lpBuf, pb = NULL;
         HBITMAP hbm = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, (void**)&lpBuf, NULL, 0);
-        
+
         pb = lpBuf + row * height;
         unsigned char * src = (unsigned char *)frame_buffer;
         for (int v = 0; v<height; v++)
@@ -94,7 +94,7 @@ nk_create_image(struct nk_image * image, const char * frame_buffer, const int wi
                 pb[i + 2] = src[2];
                 src += 3;
             }
-        }        
+        }
         SetDIBits(NULL, hbm, 0, height, lpBuf, &bi, DIB_RGB_COLORS);
         image->handle.ptr = hbm;
     }
@@ -118,10 +118,10 @@ nk_gdi_draw_image(short x, short y, unsigned short w, unsigned short h,
     HBITMAP	hbm = img.handle.ptr;
     HDC     hDCBits;
     BITMAP  bitmap;
-    
+
     if (!gdi.memory_dc || !hbm)
         return;
-    
+
     hDCBits = CreateCompatibleDC(gdi.memory_dc);
     GetObject(hbm, sizeof(BITMAP), (LPSTR)&bitmap);
     SelectObject(hDCBits, hbm);
@@ -469,14 +469,14 @@ nk_gdi_clipbard_paste(nk_handle usr, struct nk_text_edit *edit)
     (void)usr;
     if (IsClipboardFormatAvailable(CF_UNICODETEXT) && OpenClipboard(NULL))
     {
-        HGLOBAL mem = GetClipboardData(CF_UNICODETEXT); 
+        HGLOBAL mem = GetClipboardData(CF_UNICODETEXT);
         if (mem)
         {
             SIZE_T size = GlobalSize(mem) - 1;
             if (size)
             {
                 LPCWSTR wstr = (LPCWSTR)GlobalLock(mem);
-                if (wstr) 
+                if (wstr)
                 {
                     int utf8size = WideCharToMultiByte(CP_UTF8, 0, wstr, (int)(size / sizeof(wchar_t)), NULL, 0, NULL, NULL);
                     if (utf8size)
@@ -489,7 +489,7 @@ nk_gdi_clipbard_paste(nk_handle usr, struct nk_text_edit *edit)
                             free(utf8);
                         }
                     }
-                    GlobalUnlock(mem); 
+                    GlobalUnlock(mem);
                 }
             }
         }
@@ -513,9 +513,9 @@ nk_gdi_clipbard_copy(nk_handle usr, const char *text, int len)
                 {
                     MultiByteToWideChar(CP_UTF8, 0, text, len, wstr, wsize);
                     wstr[wsize] = 0;
-                    GlobalUnlock(mem); 
+                    GlobalUnlock(mem);
 
-                    SetClipboardData(CF_UNICODETEXT, mem); 
+                    SetClipboardData(CF_UNICODETEXT, mem);
                 }
             }
         }

@@ -1,4 +1,6 @@
-/* nuklear - v1.32.0 - public domain */
+/* drv-xlib : xlib front-end GUI driver for APPS. public domain */
+/* ORIGINAL: nuklear_xlib.h
+ * nuklear - v1.32.0 - public domain */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +20,7 @@
 #define NK_XLIB_IMPLEMENTATION
 #include "nuklear.h"
 #include "nuklear_xlib.h"
+#include "app.h"
 
 #define DTIME           20
 #define WINDOW_WIDTH    800
@@ -78,28 +81,13 @@ sleep_for(long t)
  * done with this library. To try out an example uncomment the defines */
 /*#define INCLUDE_ALL */
 /*#define INCLUDE_STYLE */
-/*#define INCLUDE_CALCULATOR */
-/*#define INCLUDE_OVERVIEW */
-/*#define INCLUDE_NODE_EDITOR */
 
 #ifdef INCLUDE_ALL
   #define INCLUDE_STYLE
-  #define INCLUDE_CALCULATOR
-  #define INCLUDE_OVERVIEW
-  #define INCLUDE_NODE_EDITOR
 #endif
 
 #ifdef INCLUDE_STYLE
-  #include "../style.c"
-#endif
-#ifdef INCLUDE_CALCULATOR
-  #include "../calculator.c"
-#endif
-#ifdef INCLUDE_OVERVIEW
-  #include "../overview.c"
-#endif
-#ifdef INCLUDE_NODE_EDITOR
-  #include "../node_editor.c"
+  #include "style.c"
 #endif
 
 /* ===============================================================
@@ -154,6 +142,8 @@ main(void)
     /*set_style(ctx, THEME_DARK);*/
     #endif
 
+    app_initialize(xw.width, xw.height);
+
     while (running)
     {
         /* Input */
@@ -189,20 +179,12 @@ main(void)
         nk_end(ctx);
         if (nk_window_is_hidden(ctx, "Demo")) break;
 
-        /* -------------- EXAMPLES ---------------- */
-        #ifdef INCLUDE_CALCULATOR
-          calculator(ctx);
-        #endif
-        #ifdef INCLUDE_OVERVIEW
-          overview(ctx);
-        #endif
-        #ifdef INCLUDE_NODE_EDITOR
-          node_editor(ctx);
-        #endif
-        /* ----------------------------------------- */
+	/* Update the GUI apps */
+	app_paint(ctx);
 
         /* Draw */
         XClearWindow(xw.dpy, xw.win);
+	// TODO: draw background
         nk_xlib_render(xw.win, nk_rgb(30,30,30));
         XFlush(xw.dpy);
 
@@ -213,6 +195,7 @@ main(void)
     }
 
 cleanup:
+    app_terminate();
     nk_xfont_del(xw.dpy, xw.font);
     nk_xlib_shutdown();
     XUnmapWindow(xw.dpy, xw.win);
@@ -221,4 +204,3 @@ cleanup:
     XCloseDisplay(xw.dpy);
     return 0;
 }
-
