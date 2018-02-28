@@ -84,10 +84,12 @@ nk_create_image(struct nk_image * image, const char * frame_buffer, const int wi
 
         pb = lpBuf + row * height;
         unsigned char * src = (unsigned char *)frame_buffer;
-        for (int v = 0; v<height; v++)
+	int v;
+        for (v = 0; v<height; v++)
         {
+            int i;
             pb -= row;
-            for (int i = 0; i < row; i += 3)
+            for (i = 0; i < row; i += 3)
             {
                 pb[i + 0] = src[0];
                 pb[i + 1] = src[1];
