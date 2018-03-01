@@ -10,8 +10,8 @@ ifeq ($(OS),Windows_NT)
 	CC = gcc
 	CFLAGS += -mwindows
 	## TODO: look up packages through PKGCFLAGS/PKGLIBS. don't use pkg-config.
-	pkg-config-cflags = $$(PKGCFLAGS.$(1))
-	pkg-config-libs = $$(PKGLIBS.$(1))
+	pkg-config-cflags = $(foreach pkg,$(1),$$(PKGCFLAGS.$(pkg)))
+	pkg-config-libs = $(foreach pkg,$(1),$$(PKGLIBS.$(pkg)))
 	CFLAGS = -mwindows -Wall -W -Og -ggdb
 else ifeq ($(OS),Linux)
 	## TODO: first look up packages through PKGCFLAGS/PKGLIBS. then fall back to pkg-config.
@@ -31,6 +31,9 @@ ifeq ($(OS),Windows_NT)
 	# opengl32
 	PKGCFLAGS.opengl32 =
 	PKGLIBS.opengl32 = -lopengl32
+	# glu
+	PKGCFLAGS.glu32 =
+	PKGLIBS.glu32 = -lglu32
 	# mintaro
 	PKGCFLAGS.mintaro =
 	PKGLIBS.mintaro = -lgdi32
@@ -67,8 +70,8 @@ define process-config
 $(info Processing configuration for $1 ...)
 $1.SRCS ?= $1.c
 $1.EXEC ?= $1$X
-$1.CFLAGS ?= $(CFLAGS) $(call pkg-config-cflags,$($1.PKGS))
-$1.LDFLAGS ?= $(LDFLAGS) $(call pkg-config-libs,$($1.PKGS))
+$1.CFLAGS ?= $(CFLAGS) $(if $($1.PKGS),$(call pkg-config-cflags,$($1.PKGS)))
+$1.LDFLAGS ?= $(LDFLAGS) $(if $($1.PKGS),$(call pkg-config-libs,$($1.PKGS)))
 endef
 
 # generates rules for one target. currently does .c to executable without intermediate .o
