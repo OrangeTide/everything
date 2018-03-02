@@ -10,21 +10,14 @@
 #include <GL/glext.h>
 #include <GL/wglext.h>
 
-#define _unused __attribute__((unused))
-
 // #define USE_GLES2 0
 #define USE_GLES2 1
 #define USE_ALPHA_DESKTOP 1
 
-void game_initialize(void);
-void game_paint(void);
-
 #define WIDTH 640
 #define HEIGHT 480
 
-const int fullscreen = 0; // TODO: make this configurable at start-up
-static HGLRC glrc; /* gl context */
-static HWND win;
+#define _unused __attribute__((unused))
 
 /* helper for using/debugging wglGetProcAddress */
 #if NDEBUG
@@ -32,6 +25,17 @@ static HWND win;
 #else
 static void *load_proc(const char *name) _unused;
 #endif
+
+void game_initialize(void);
+void game_paint(void);
+
+const int fullscreen = 0; // TODO: make this configurable at start-up
+static HGLRC glrc; /* gl context */
+static HWND win;
+static HWND fake_win;
+
+static PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
+static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
 /* generates dispatch stub for functions that don't return (void) */
 #define GEN_GL_VOID_PROC(func, type, params, args) \
@@ -452,127 +456,71 @@ load_gl(void)
 static LRESULT CALLBACK
 win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	HDC hDC;
+	INT ipf;
+	UINT num_formats_chosen;
+	PIXELFORMATDESCRIPTOR pfd;
+	const int pix_attribs[] = { /* for wglChoosePixelFormatARB */
+		WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+		WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+		WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
+		WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+		WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+//		WGL_TRANSPARENT_ARB, TRUE,
+		WGL_COLOR_BITS_ARB, 24,
+		WGL_ALPHA_BITS_ARB, 8,
+		WGL_DEPTH_BITS_ARB, 24,
+		WGL_STENCIL_BITS_ARB, 8,
+		WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
+		WGL_SAMPLES_ARB, 4,
+		0, 0
+	};
+	const int ctx_attribs[] = { /* for wglCreateContextAttribsARB */
+#if USE_GLES2
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 0,
+		WGL_CONTEXT_FLAGS_ARB, 0,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_ES2_PROFILE_BIT_EXT,
+		0
+#else
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 2,
+		WGL_CONTEXT_FLAGS_ARB, 0,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+		// TODO: use WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+		0
+#endif
+	};
+	HRGN hRgn;
+	DWM_BLURBEHIND bb;
+
 	switch(uMsg) {
-	case WM_CREATE: {
-		HDC hDC = GetWindowDC(hWnd);
-
-		PIXELFORMATDESCRIPTOR pfd = { 0 };
-		INT nPixelFormat;
-
-		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-		pfd.nVersion = 1;
-		pfd.dwFlags = PFD_DOUBLEBUFFER | PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW;
-//		pfd.dwFlags |= PFD_SUPPORT_COMPOSITION;
-		pfd.iPixelType = PFD_TYPE_RGBA;
-		pfd.cColorBits = 32;
-		pfd.cDepthBits = 24;
-		pfd.cStencilBits = 8;
-		pfd.iLayerType = PFD_MAIN_PLANE;
-
-		nPixelFormat = ChoosePixelFormat(hDC, &pfd);
-		if (nPixelFormat == 0) {
-			die("Window Creation Failed!");
-			break;
-		}
-
-		SetPixelFormat(hDC, nPixelFormat, &pfd);
-
-		HGLRC tempContext = wglCreateContext(hDC);
-		if (!tempContext)
-			die("Unable to create temporary OpenGL context");
-		wglMakeCurrent(hDC, tempContext);
+	case WM_CREATE:
+		hDC = GetWindowDC(hWnd);
 
 #if USE_ALPHA_DESKTOP
-		/* using our temporary context - choose the real pixel format */
-		int attribs[] = {
-/*
-			WGL_DRAW_TO_WINDOW_ARB, TRUE,
-			WGL_DOUBLE_BUFFER_ARB, TRUE,
-			WGL_SUPPORT_OPENGL_ARB, TRUE,
-			WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
-			WGL_TRANSPARENT_ARB, TRUE,
-			WGL_COLOR_BITS_ARB, 32,
-			WGL_RED_BITS_ARB, 8,
-			WGL_GREEN_BITS_ARB, 8,
-			WGL_BLUE_BITS_ARB, 8,
-			WGL_ALPHA_BITS_ARB, 8,
-			WGL_DEPTH_BITS_ARB, 24,
-			WGL_STENCIL_BITS_ARB, 8,
-*/
-			WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
-			WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
-			WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
-			WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
-			WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
-			WGL_COLOR_BITS_ARB, 32,
-			WGL_ALPHA_BITS_ARB, 8,
-			WGL_DEPTH_BITS_ARB, 24,
-			WGL_STENCIL_BITS_ARB, 8,
-			WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
-			WGL_SAMPLES_ARB, 4,
-
-			0, 0
-		};
-		UINT num_formats_chosen;
-
-		PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
-		if (!wglChoosePixelFormatARB)
-			die("Missing wglChoosePixelFormatARB");
-		wglChoosePixelFormatARB(hDC, attribs, NULL, 1, &nPixelFormat, &num_formats_chosen);
-		DescribePixelFormat(hDC, nPixelFormat, sizeof(pfd), &pfd);
-		SetPixelFormat(hDC, nPixelFormat, &pfd);
+		/* Step XXX. configure window transparency */
+		hRgn = CreateRectRgn(0, 0, -1, -1);
+		// hRgn = CreateRectRgn(0, 0, 1, 1);
+		ZeroMemory(&bb, sizeof(bb));
+		bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
+		bb.fEnable = TRUE;
+		bb.hRgnBlur = hRgn;
+		DwmEnableBlurBehindWindow(win, &bb);
 #endif
+		/* Step 9. set pixel format / wglChoosePixelFormatARB */
+		wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen);
+		DescribePixelFormat(hDC, ipf, sizeof(pfd), &pfd);
+		SetPixelFormat(hDC, ipf, &pfd);
 
-		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB =
-			(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-
-		if (wglCreateContextAttribsARB) { /* if not NULL then 3.0+ contexts are possible... */
-			int attribs[] = {
-#if USE_GLES2
-				WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
-				WGL_CONTEXT_MINOR_VERSION_ARB, 0,
-				WGL_CONTEXT_FLAGS_ARB, 0,
-				WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_ES2_PROFILE_BIT_EXT,
-				0
-#else
-				WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-				WGL_CONTEXT_MINOR_VERSION_ARB, 2,
-				WGL_CONTEXT_FLAGS_ARB, 0,
-				WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-//				WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-				0
-#endif
-			};
-
-			/* now we create a context with the new API */
-			glrc = wglCreateContextAttribsARB(hDC, 0, attribs);
-			wglMakeCurrent(NULL, NULL);
-			wglDeleteContext(tempContext);
-			wglMakeCurrent(hDC, glrc);
-
-#if USE_GLES2
-			info("GLES 2 context: %s", glGetString(GL_VERSION));
-#else
-			info("OpenGL 3.0+ context: %s", glGetString(GL_VERSION));
-#endif
-		} else {
-			/* fallback to pre-3.0 context */
-			glrc = tempContext;
-			info("Legacy OpenGL context: %s", glGetString(GL_VERSION));
-		}
-
+		/* Step 10. create real context / wglCreateContextAttribsARB */
+		glrc = wglCreateContextAttribsARB(hDC, 0, ctx_attribs);
 		if (!glrc)
 			die("Unable to create OpenGL context");
 
-		load_gl();
-
-		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT =
-			(PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-		if (wglSwapIntervalEXT)
-			wglSwapIntervalEXT(1);
-
-		return 0;
-	}
+		/* Step 12. done - now we can use the full GL context */
+		wglMakeCurrent(hDC, glrc);
+		break; /* or return 0; ???? */
 
 	case WM_ERASEBKGND:
 		return 0;
@@ -599,8 +547,94 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_CLOSE:
 		wglMakeCurrent(NULL, NULL);
 		wglDeleteContext(glrc);
+		glrc = 0;
+		DestroyWindow(win);
+		win = 0;
 		PostQuitMessage(0);
 		return 0;
+	}
+
+	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+static LRESULT CALLBACK
+fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	HDC hDC;
+	PIXELFORMATDESCRIPTOR pfd;
+	WNDCLASS wc;
+	ATOM win_class;
+	INT ipf;
+	DWORD style;
+	DWORD exstyle;
+	RECT rect;
+
+	if (uMsg == WM_CREATE) {
+		hDC = GetWindowDC(hWnd);
+
+		// Step 3. set fake pixel format / ChoosePixelFormat
+		ZeroMemory(&pfd, sizeof(pfd));
+		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+		pfd.nVersion = 1;
+		pfd.dwFlags = PFD_DOUBLEBUFFER | PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW; /* PFD_SUPPORT_COMPOSITION; */
+		pfd.iPixelType = PFD_TYPE_RGBA;
+		pfd.cColorBits = 32;
+		pfd.cDepthBits = 24;
+		pfd.cStencilBits = 8;
+		pfd.iLayerType = PFD_MAIN_PLANE;
+
+		ipf = ChoosePixelFormat(hDC, &pfd);
+		if (ipf == 0) {
+			die("Window Creation Failed!");
+			return 1;
+		}
+		SetPixelFormat(hDC, ipf, &pfd);
+
+		/* Step 4. create fake GL context */
+		HGLRC fake_glrc = wglCreateContext(hDC);
+		if (!fake_glrc)
+			die("Unable to create temporary OpenGL context");
+		wglMakeCurrent(hDC, fake_glrc);
+
+		/* Step 5. Get function pointers for extensions wglChoosePixelFormatARB and wglCreateContextAttribARB */
+		wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
+		wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+
+		/* Step 6. destroy the fake window and fake context */
+		wglMakeCurrent(NULL, NULL);
+		wglDeleteContext(fake_glrc);
+		fake_glrc = 0;
+		DestroyWindow(fake_win);
+		fake_win = 0;
+
+		/* Step 7. register real class */
+		ZeroMemory(&wc, sizeof(wc));
+		// wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+		wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+		wc.lpfnWndProc = win_proc;
+		// wc.cbClsExtra = 0;
+		// wc.cbWndExtra = 0;
+		wc.hInstance = GetModuleHandle(NULL);
+		wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		// wc.hbrBackground = 0;
+		// wc.lpszMenuName = NULL;
+		wc.lpszClassName = "glWindowCls";
+		win_class = RegisterClass(&wc);
+
+		/* Step 8. create real window */
+		// exstyle = WS_EX_TRANSPARENT | WS_EX_APPWINDOW | WS_EX_COMPOSITED;
+		// cannot use WS_EX_LAYERED if we are OWNDC
+		exstyle = WS_EX_APPWINDOW;
+		style = WS_OVERLAPPEDWINDOW;
+		// style = WS_POPUP;
+		rect.left = 0;
+		rect.top = 0;
+		rect.right = WIDTH;
+		rect.bottom = HEIGHT;
+		AdjustWindowRectEx(&rect, style, FALSE, exstyle);
+		// win = CreateWindow(MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
+		win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "My GL window", style | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -609,63 +643,36 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 static void
 new_win(void)
 {
-	WNDCLASSEX wc = { 0 };
+	WNDCLASS fake_wc;
+	ATOM fake_win_class;
 
-	wc.cbSize = sizeof(wc);
-	wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-	wc.lpfnWndProc = win_proc;
-	wc.hInstance = GetModuleHandleW(NULL);
-	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.lpszClassName = "MyWindowClass";
-	ATOM win_class = RegisterClassEx(&wc);
+	// steps:
+	// 1. register fake class
+	// 2. create fake window
+	// 3. set fake pixel format / ChoosePixelFormat
+	// 4. create fake GL context
+	// 5. Get function pointers for extensions wglChoosePixelFormatARB and wglCreateContextAttribARB
+	// 6. destroy the fake window and fake context
+	// 7. register real class
+	// 8. create real window
+	// 9. set pixel format / wglChoosePixelFormatARB
+	// 10. create real context / wglCreateContextAttribsARB
+	// 11. (or we could destroy fake stuff here?)
+	// 12. done - now we can use the full GL context
 
-	DWORD exstyle;
-	DWORD style;
+	/* Step 1. register class */
+	ZeroMemory(&fake_wc, sizeof(fake_wc));
+	fake_wc.style = 0;
+	fake_wc.lpfnWndProc = fake_win_proc;
+	fake_wc.hInstance = GetModuleHandle(NULL);
+	fake_wc.lpszClassName = "fakeGlWindowCls";
+	fake_win_class = RegisterClass(&fake_wc);
 
-	if (fullscreen) {
-		DEVMODE dm = { .dmSize = sizeof(dm) };
-		dm.dmSize = sizeof(dm);
-		dm.dmPelsWidth = WIDTH;
-		dm.dmPelsHeight = HEIGHT;
-		dm.dmBitsPerPel = 32;
-		dm.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
-		ChangeDisplaySettings(&dm, CDS_FULLSCREEN);
-		exstyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-		style = WS_POPUP;
-		// ShowCursor(FALSE);
-	} else {
-#if USE_ALPHA_DESKTOP
-	//	exstyle = WS_EX_LAYERED;
-		exstyle = WS_EX_TRANSPARENT;
-	//	style = WS_POPUP;
-//		style = WS_OVERLAPPEDWINDOW;
-		style = WS_CAPTION | WS_SYSMENU | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
-#else
-		exstyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-		style = WS_OVERLAPPEDWINDOW;
-#endif
-	}
+	/* Step 2. Create fake window */
+	fake_win = CreateWindow(MAKEINTATOM(fake_win_class), "fake window",
+			0, CW_USEDEFAULT, CW_USEDEFAULT, 1, 1, NULL, NULL,
+			fake_wc.hInstance, NULL);
 
-	RECT rect = { 0, 0, WIDTH, HEIGHT };
-	AdjustWindowRectEx(&rect, style, FALSE, exstyle);
-	win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "MyWindow",
-			style | WS_VISIBLE,
-			CW_USEDEFAULT, CW_USEDEFAULT,
-			rect.right - rect.left, rect.bottom - rect.top,
-			NULL, NULL, wc.hInstance, NULL);
-#if USE_ALPHA_DESKTOP
-//	if (!fullscreen) {
-//		HRGN hRgn = CreateRectRgn(0, 0, -1, -1);
-		DWM_BLURBEHIND bb = {
-			// .dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION,
-			.dwFlags = DWM_BB_ENABLE,
-			.fEnable = TRUE,
-//			.hRgnBlur = hRgn,
-		};
-		DwmEnableBlurBehindWindow(win, &bb);
-//	}
-#endif
 }
 
 int WINAPI
