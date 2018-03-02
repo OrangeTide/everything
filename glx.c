@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define USE_GLES2 0
 
@@ -26,28 +27,28 @@ static void
 info(const char *fmt, ...)
 {
 	va_list ap;
-	char buf[256];
+	char msg[256];
 
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	strcpy(msg, "INFO:");
+	vsnprintf(msg + 5, sizeof(msg) - 5, fmt, ap);
 	va_end(ap);
-	fputs("Info:", stderr);
-	fputs(buf, stderr);
-	fputc('\n', stderr);
+	strcat(msg, "\n");
+	fputs(msg, stderr);
 }
 
 static void
 pr_err(const char *fmt, ...)
 {
 	va_list ap;
-	char buf[256];
+	char msg[256];
 
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	strcpy(msg, "ERROR:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
 	va_end(ap);
-	fputs("Error:", stderr);
-	fputs(buf, stderr);
-	fputc('\n', stderr);
+	strcat(msg, "\n");
+	fputs(msg, stderr);
 }
 
 static bool

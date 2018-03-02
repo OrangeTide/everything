@@ -398,7 +398,8 @@ pr_err(const char *fmt, ...)
 	char msg[256];
 	va_list ap;
 	va_start(ap, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, ap);
+	strcpy(msg, "ERROR:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
 	va_end(ap);
 	puts(msg);
 	MessageBox(0, msg, "Error!", MB_ICONSTOP | MB_OK);
@@ -410,16 +411,33 @@ info(const char *fmt, ...)
 	char msg[256];
 	va_list ap;
 	va_start(ap, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, ap);
+	strcpy(msg, "INFO:");
+	vsnprintf(msg + 5, sizeof(msg) - 5, fmt, ap);
 	va_end(ap);
 	puts(msg);
 }
+
+#if NDEBUG
+#define pr_dbg(...) do { /* nothing */ } while(0)
+#else
+static void
+pr_dbg(const char *fmt, ...)
+{
+	char msg[256];
+	va_list ap;
+	va_start(ap, fmt);
+	strcpy(msg, "DEBUG:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
+	va_end(ap);
+	puts(msg);
+}
+#endif
 
 static void *load_proc(const char *name)
 {
 	void *proc = wglGetProcAddress(name);
 	if (proc)
-		info("loaded %s", name);
+		pr_dbg("loaded %s", name);
 	else
 		die("failed to load GL extension");
 	return proc;
