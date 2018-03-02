@@ -1,7 +1,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdarg.h>
+
 #include <windows.h>
+#include <dwmapi.h>
+
 // #define GL_GLEXT_PROTOTYPES 1
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -11,6 +14,7 @@
 
 // #define USE_GLES2 0
 #define USE_GLES2 1
+#define USE_ALPHA_DESKTOP 1
 
 void game_initialize(void);
 void game_paint(void);
@@ -433,29 +437,73 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	switch(uMsg) {
 	case WM_CREATE: {
 		HDC hDC = GetWindowDC(hWnd);
-		PIXELFORMATDESCRIPTOR pfd;
 
-		memset(&pfd, 0, sizeof(PIXELFORMATDESCRIPTOR));
+		PIXELFORMATDESCRIPTOR pfd = { 0 };
+		INT nPixelFormat;
+
 		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
 		pfd.nVersion = 1;
 		pfd.dwFlags = PFD_DOUBLEBUFFER | PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW;
+//		pfd.dwFlags |= PFD_SUPPORT_COMPOSITION;
 		pfd.iPixelType = PFD_TYPE_RGBA;
 		pfd.cColorBits = 32;
 		pfd.cDepthBits = 24;
 		pfd.cStencilBits = 8;
 		pfd.iLayerType = PFD_MAIN_PLANE;
 
-		int nPixelFormat = ChoosePixelFormat(hDC, &pfd);
+		nPixelFormat = ChoosePixelFormat(hDC, &pfd);
 		if (nPixelFormat == 0) {
 			die("Window Creation Failed!");
 			break;
 		}
+
 		SetPixelFormat(hDC, nPixelFormat, &pfd);
 
 		HGLRC tempContext = wglCreateContext(hDC);
 		if (!tempContext)
 			die("Unable to create temporary OpenGL context");
 		wglMakeCurrent(hDC, tempContext);
+
+#if USE_ALPHA_DESKTOP
+		/* using our temporary context - choose the real pixel format */
+		int attribs[] = {
+/*
+			WGL_DRAW_TO_WINDOW_ARB, TRUE,
+			WGL_DOUBLE_BUFFER_ARB, TRUE,
+			WGL_SUPPORT_OPENGL_ARB, TRUE,
+			WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+			WGL_TRANSPARENT_ARB, TRUE,
+			WGL_COLOR_BITS_ARB, 32,
+			WGL_RED_BITS_ARB, 8,
+			WGL_GREEN_BITS_ARB, 8,
+			WGL_BLUE_BITS_ARB, 8,
+			WGL_ALPHA_BITS_ARB, 8,
+			WGL_DEPTH_BITS_ARB, 24,
+			WGL_STENCIL_BITS_ARB, 8,
+*/
+			WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+			WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+			WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
+			WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+			WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+			WGL_COLOR_BITS_ARB, 32,
+			WGL_ALPHA_BITS_ARB, 8,
+			WGL_DEPTH_BITS_ARB, 24,
+			WGL_STENCIL_BITS_ARB, 8,
+			WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
+			WGL_SAMPLES_ARB, 4,
+
+			0, 0
+		};
+		UINT num_formats_chosen;
+
+		PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
+		if (!wglChoosePixelFormatARB)
+			die("Missing wglChoosePixelFormatARB");
+		wglChoosePixelFormatARB(hDC, attribs, NULL, 1, &nPixelFormat, &num_formats_chosen);
+		DescribePixelFormat(hDC, nPixelFormat, sizeof(pfd), &pfd);
+		SetPixelFormat(hDC, nPixelFormat, &pfd);
+#endif
 
 		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB =
 			(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
@@ -543,15 +591,16 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 static void
 new_win(void)
 {
-	WNDCLASS wc = { 0 };
+	WNDCLASSEX wc = { 0 };
 
+	wc.cbSize = sizeof(wc);
 	wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = win_proc;
 	wc.hInstance = GetModuleHandleW(NULL);
 	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.lpszClassName = "MyWindowClass";
-	RegisterClass(&wc);
+	ATOM win_class = RegisterClassEx(&wc);
 
 	DWORD exstyle;
 	DWORD style;
@@ -568,17 +617,37 @@ new_win(void)
 		style = WS_POPUP;
 		// ShowCursor(FALSE);
 	} else {
+#if USE_ALPHA_DESKTOP
+	//	exstyle = WS_EX_LAYERED;
+		exstyle = WS_EX_TRANSPARENT;
+	//	style = WS_POPUP;
+//		style = WS_OVERLAPPEDWINDOW;
+		style = WS_CAPTION | WS_SYSMENU | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+#else
 		exstyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
 		style = WS_OVERLAPPEDWINDOW;
+#endif
 	}
 
 	RECT rect = { 0, 0, WIDTH, HEIGHT };
 	AdjustWindowRectEx(&rect, style, FALSE, exstyle);
-	win = CreateWindowEx(exstyle, wc.lpszClassName, "MyWindow",
+	win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "MyWindow",
 			style | WS_VISIBLE,
 			CW_USEDEFAULT, CW_USEDEFAULT,
 			rect.right - rect.left, rect.bottom - rect.top,
 			NULL, NULL, wc.hInstance, NULL);
+#if USE_ALPHA_DESKTOP
+//	if (!fullscreen) {
+//		HRGN hRgn = CreateRectRgn(0, 0, -1, -1);
+		DWM_BLURBEHIND bb = {
+			// .dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION,
+			.dwFlags = DWM_BB_ENABLE,
+			.fEnable = TRUE,
+//			.hRgnBlur = hRgn,
+		};
+		DwmEnableBlurBehindWindow(win, &bb);
+//	}
+#endif
 }
 
 int WINAPI
