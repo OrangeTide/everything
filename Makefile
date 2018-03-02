@@ -30,7 +30,7 @@ endif
 ifeq ($(OS),Windows_NT)
 	# opengl32
 	PKGCFLAGS.opengl32 =
-	PKGLIBS.opengl32 = -lopengl32 -ldwmapi
+	PKGLIBS.opengl32 = -lopengl32
 	# glu
 	PKGCFLAGS.glu32 =
 	PKGLIBS.glu32 = -lglu32

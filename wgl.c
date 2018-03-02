@@ -3,7 +3,6 @@
 #include <stdarg.h>
 
 #include <windows.h>
-#include <dwmapi.h>
 
 // #define GL_GLEXT_PROTOTYPES 1
 #include <GL/gl.h>
@@ -26,10 +25,16 @@
 static void *load_proc(const char *name) _unused;
 #endif
 
+/* custom accelerators  */
+enum {
+	MY_DO_QUIT = 100,
+	MY_DO_TOGGLE_FULLSCREEN,
+};
+
 void game_initialize(void);
 void game_paint(void);
 
-const int fullscreen = 0; // TODO: make this configurable at start-up
+static int fullscreen = 0; // TODO: make this configurable at start-up
 static HGLRC glrc; /* gl context */
 static HWND win;
 static HWND fake_win;
@@ -447,12 +452,6 @@ static void *load_proc(const char *name)
 	return proc;
 }
 
-static void
-load_gl(void)
-{
-	// TODO: implement this
-}
-
 static LRESULT CALLBACK
 win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -491,26 +490,17 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		0
 #endif
 	};
-	HRGN hRgn;
-	DWM_BLURBEHIND bb;
 
 	switch(uMsg) {
 	case WM_CREATE:
 		hDC = GetWindowDC(hWnd);
 
-#if USE_ALPHA_DESKTOP
-		/* Step XXX. configure window transparency */
-		hRgn = CreateRectRgn(0, 0, -1, -1);
-		// hRgn = CreateRectRgn(0, 0, 1, 1);
-		ZeroMemory(&bb, sizeof(bb));
-		bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
-		bb.fEnable = TRUE;
-		bb.hRgnBlur = hRgn;
-		DwmEnableBlurBehindWindow(win, &bb);
-#endif
+//		SetBkMode(hDC, TRANSPARENT);
+
 		/* Step 9. set pixel format / wglChoosePixelFormatARB */
 		wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen);
 		DescribePixelFormat(hDC, ipf, sizeof(pfd), &pfd);
+		pfd.dwFlags |= PFD_SUPPORT_COMPOSITION; // TODO: remove this
 		SetPixelFormat(hDC, ipf, &pfd);
 
 		/* Step 10. create real context / wglCreateContextAttribsARB */
@@ -520,6 +510,7 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		/* Step 12. done - now we can use the full GL context */
 		wglMakeCurrent(hDC, glrc);
+
 		break; /* or return 0; ???? */
 
 	case WM_ERASEBKGND:
@@ -536,13 +527,23 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		PostMessage(hWnd, WM_PAINT, 0, 0);
 		return 0;
 
-	case WM_CHAR:
-		switch (wParam) {
-		case 27: /* ESC key */
-		PostQuitMessage(0);
+	case WM_KEYDOWN:
+		// TODO: process the keyboard input
 		break;
+
+	case WM_COMMAND: /* handles the hot-key accelerators we've defined */
+		pr_dbg("WM_COMMAND: %#x\n", LOWORD(wParam));
+		switch (LOWORD(wParam)) {
+		case MY_DO_QUIT:
+			PostQuitMessage(0);
+			return 0;
+		case MY_DO_TOGGLE_FULLSCREEN:
+			fullscreen = !fullscreen;
+			info("TODO: toggle fullscreen / re-initialize GL context");
+			// TODO: initialize the GL context
+			return 0;
 		}
-		return 0;
+		break;
 
 	case WM_CLOSE:
 		wglMakeCurrent(NULL, NULL);
@@ -577,6 +578,7 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
 		pfd.nVersion = 1;
 		pfd.dwFlags = PFD_DOUBLEBUFFER | PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW; /* PFD_SUPPORT_COMPOSITION; */
+		pfd.dwFlags |= PFD_SUPPORT_COMPOSITION; // TODO: remove this
 		pfd.iPixelType = PFD_TYPE_RGBA;
 		pfd.cColorBits = 32;
 		pfd.cDepthBits = 24;
@@ -609,8 +611,12 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		/* Step 7. register real class */
 		ZeroMemory(&wc, sizeof(wc));
-		// wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+#if USE_ALPHA_DESKTOP
+		// cannot use WS_EX_LAYERED if we are OWNDC
 		wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+#else
+		wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+#endif
 		wc.lpfnWndProc = win_proc;
 		// wc.cbClsExtra = 0;
 		// wc.cbWndExtra = 0;
@@ -623,18 +629,25 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		win_class = RegisterClass(&wc);
 
 		/* Step 8. create real window */
+#if USE_ALPHA_DESKTOP
+		exstyle = WS_EX_LAYERED;
+//		exstyle |= WS_EX_TRANSPARENT | WS_EX_COMPOSITED;
+		style = WS_OVERLAPPEDWINDOW;
+		// style = WS_POPUP;
+#else
 		// exstyle = WS_EX_TRANSPARENT | WS_EX_APPWINDOW | WS_EX_COMPOSITED;
-		// cannot use WS_EX_LAYERED if we are OWNDC
 		exstyle = WS_EX_APPWINDOW;
 		style = WS_OVERLAPPEDWINDOW;
 		// style = WS_POPUP;
+#endif
 		rect.left = 0;
 		rect.top = 0;
 		rect.right = WIDTH;
 		rect.bottom = HEIGHT;
 		AdjustWindowRectEx(&rect, style, FALSE, exstyle);
 		// win = CreateWindow(MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
-		win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "My GL window", style | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
+		win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
+		SetLayeredWindowAttributes(win, 0, 128, LWA_ALPHA);
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -678,31 +691,59 @@ new_win(void)
 int WINAPI
 WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCmdLine _unused, int nCmdShow)
 {
-	BOOL has_init = FALSE;
+	ACCEL acc[] = {
+		{ (FVIRTKEY), VK_F11, MY_DO_TOGGLE_FULLSCREEN },
+		{ (FVIRTKEY), VK_ESCAPE, MY_DO_QUIT },
+		{ (FALT | FVIRTKEY), VK_RETURN, MY_DO_TOGGLE_FULLSCREEN },
+	};
+
 	new_win();
 
 	ShowWindow(win, nCmdShow);
+//	ShowWindow(win, SW_SHOWNORMAL);
 	UpdateWindow(win);
 
+	HACCEL ha = CreateAcceleratorTable(acc, sizeof(acc) / sizeof(*acc));
+
 	MSG msg;
-	while (GetMessage(&msg, NULL, 0, 0)) {
-		DispatchMessage(&msg);
+
+	/* don't render until window and gl context are created */
+	while (!win && !glrc) {
+		if (GetMessage(&msg, 0, 0, 0)) {
+			if (!TranslateAccelerator(win, ha, &msg)) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+		}
+	}
+
+	game_initialize();
+
+	while (1) {
+
+		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
+			if (msg.message == WM_QUIT)
+				break;
+			if (!TranslateAccelerator(win, ha, &msg)) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+		}
+
 		if (!win)
 			info("No Window!");
 		if (!glrc)
 			info("No GL context!");
 
 		if (win && glrc) {
-			if (!has_init) {
-				game_initialize();
-				has_init = TRUE;
-			}
 			game_paint();
 
 			HDC hDC = GetWindowDC(win);
 			SwapBuffers(hDC);
 		}
 	}
+
+	DestroyAcceleratorTable(ha);
 
 	return msg.wParam;
 }
