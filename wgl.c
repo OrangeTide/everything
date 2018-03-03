@@ -4,7 +4,6 @@
 
 #include <windows.h>
 
-// #define GL_GLEXT_PROTOTYPES 1
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/wglext.h>
@@ -13,8 +12,8 @@
 #define USE_GLES2 1
 #define USE_ALPHA_DESKTOP 1
 
-#define WIDTH 640
-#define HEIGHT 480
+#define INITIAL_WIDTH 640
+#define INITIAL_HEIGHT 480
 
 #define _unused __attribute__((unused))
 
@@ -34,11 +33,15 @@ enum {
 void game_initialize(void);
 void game_paint(void);
 
-static int fullscreen = 0; // TODO: make this configurable at start-up
+/** main window state **/
+static BOOL fullscreen = FALSE; // TODO: needs to be implemented
+// static BOOL desktop_alpha = TRUE;
 static HGLRC glrc; /* gl context */
 static HWND win;
+static UINT width = INITIAL_WIDTH, height = INITIAL_HEIGHT;
 static HWND fake_win;
 
+/** function pointers **/
 static PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
@@ -452,10 +455,9 @@ static void *load_proc(const char *name)
 	return proc;
 }
 
-static LRESULT CALLBACK
-win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+static void
+create_glrc(HDC hDC)
 {
-	HDC hDC;
 	INT ipf;
 	UINT num_formats_chosen;
 	PIXELFORMATDESCRIPTOR pfd;
@@ -491,40 +493,58 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 #endif
 	};
 
+	/* Step 9. set pixel format / wglChoosePixelFormatARB */
+	wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen);
+	DescribePixelFormat(hDC, ipf, sizeof(pfd), &pfd);
+	pfd.dwFlags |= PFD_SUPPORT_COMPOSITION; // TODO: remove this
+	SetPixelFormat(hDC, ipf, &pfd);
+
+	/* Step 10. create real context / wglCreateContextAttribsARB */
+	glrc = wglCreateContextAttribsARB(hDC, 0, ctx_attribs);
+	if (!glrc)
+		die("Unable to create OpenGL context");
+
+	/* Step 12. done - now we can use the full GL context */
+	wglMakeCurrent(hDC, glrc);
+}
+
+
+static LRESULT CALLBACK
+win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	HDC hDC;
+
 	switch(uMsg) {
 	case WM_CREATE:
 		hDC = GetWindowDC(hWnd);
 
-//		SetBkMode(hDC, TRANSPARENT);
+		create_glrc(hDC);
 
-		/* Step 9. set pixel format / wglChoosePixelFormatARB */
-		wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen);
-		DescribePixelFormat(hDC, ipf, sizeof(pfd), &pfd);
-		pfd.dwFlags |= PFD_SUPPORT_COMPOSITION; // TODO: remove this
-		SetPixelFormat(hDC, ipf, &pfd);
-
-		/* Step 10. create real context / wglCreateContextAttribsARB */
-		glrc = wglCreateContextAttribsARB(hDC, 0, ctx_attribs);
-		if (!glrc)
-			die("Unable to create OpenGL context");
-
-		/* Step 12. done - now we can use the full GL context */
-		wglMakeCurrent(hDC, glrc);
-
-		break; /* or return 0; ???? */
+		break;
 
 	case WM_ERASEBKGND:
 		return 0;
 
 	case WM_PAINT:
 		// static PAINTSTRUCT ps;
-		// BeginPaint(hWnd, &ps);
+		// hDC = BeginPaint(hWnd, &ps);
+		// game_paint();
+		// if (desktop_alpha)
+		//   BitBlt(hDC, 0, 0, width, height, pdcDIB, 0, 0, SRCCOPY)
+		// else
+		//   SwapBuffers(hDC); // or maybe do nothing?
 		// EndPaint(hWnd, &ps);
 		return 0;
 
 	case WM_SIZE:
-		glViewport(0, 0, LOWORD(lParam), HIWORD(lParam));
-		PostMessage(hWnd, WM_PAINT, 0, 0);
+		width = LOWORD(lParam);
+		height = HIWORD(lParam);
+		wglMakeCurrent(NULL, NULL);
+		wglDeleteContext(glrc);
+		glrc = 0;
+		hDC = GetWindowDC(hWnd);
+		create_glrc(hDC);
+		// TODO: need to share contexts ...
 		return 0;
 
 	case WM_KEYDOWN:
@@ -540,7 +560,8 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case MY_DO_TOGGLE_FULLSCREEN:
 			fullscreen = !fullscreen;
 			info("TODO: toggle fullscreen / re-initialize GL context");
-			// TODO: initialize the GL context
+			// desktop_alpha = !full_screen; .. or maybe save/restore it?
+			// TODO: initialize the GL context: create_glrc(hDC);
 			return 0;
 		}
 		break;
@@ -642,8 +663,8 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 #endif
 		rect.left = 0;
 		rect.top = 0;
-		rect.right = WIDTH;
-		rect.bottom = HEIGHT;
+		rect.right = width;
+		rect.bottom = height;
 		AdjustWindowRectEx(&rect, style, FALSE, exstyle);
 		// win = CreateWindow(MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
 		win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
