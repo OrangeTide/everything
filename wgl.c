@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include <windows.h>
+#include <malloc.h>
 
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -10,7 +11,7 @@
 
 // #define USE_GLES2 0
 #define USE_GLES2 1
-#define USE_ALPHA_DESKTOP 1
+// #define USE_ALPHA_DESKTOP 1 /* sets default state. don't define this to disable the support */
 
 #define INITIAL_WIDTH 640
 #define INITIAL_HEIGHT 480
@@ -35,11 +36,19 @@ void game_paint(void);
 
 /** main window state **/
 static BOOL fullscreen = FALSE; // TODO: needs to be implemented
-// static BOOL desktop_alpha = TRUE;
 static HGLRC glrc; /* gl context */
 static HWND win;
 static UINT width = INITIAL_WIDTH, height = INITIAL_HEIGHT;
 static HWND fake_win;
+
+/* state related to USE_ALPHA_DESKTOP support.  */
+#ifdef USE_ALPHA_DESKTOP
+static BOOL desktop_alpha = USE_ALPHA_DESKTOP;
+static HDC pdcDIB;
+static HBITMAP hbmpDIB;
+// static UINT bitmap_width, bitmap_height; /* in case we want to do StretchDIBits() */
+static void *pixels;
+#endif
 
 /** function pointers **/
 static PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
@@ -462,7 +471,12 @@ create_glrc(HDC hDC)
 	UINT num_formats_chosen;
 	PIXELFORMATDESCRIPTOR pfd;
 	const int pix_attribs[] = { /* for wglChoosePixelFormatARB */
+#if USE_ALPHA_DESKTOP
+		// TODO: set this at run-time
+		WGL_DRAW_TO_BITMAP_ARB, GL_TRUE,
+#else
 		WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+#endif
 		WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
 		WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
 		WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
@@ -493,10 +507,13 @@ create_glrc(HDC hDC)
 #endif
 	};
 
+	assert(hDC != NULL);
+
 	/* Step 9. set pixel format / wglChoosePixelFormatARB */
-	wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen);
+	if (!wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen))
+		die("No matching pixel formats for OpenGL context");
+	info("pf=%d num_formats_chosen=%d", (int)ipf, (int)num_formats_chosen);
 	DescribePixelFormat(hDC, ipf, sizeof(pfd), &pfd);
-	pfd.dwFlags |= PFD_SUPPORT_COMPOSITION; // TODO: remove this
 	SetPixelFormat(hDC, ipf, &pfd);
 
 	/* Step 10. create real context / wglCreateContextAttribsARB */
@@ -508,6 +525,51 @@ create_glrc(HDC hDC)
 	wglMakeCurrent(hDC, glrc);
 }
 
+#ifdef USE_ALPHA_DESKTOP
+static int
+create_dib(void)
+{
+	PBITMAPINFOHEADER bi;
+	PBITMAPINFO pbmi;
+	const BYTE cClrBits = 24;
+	const unsigned long colors = cClrBits < 24 ? 1UL << cClrBits : 0;
+
+	pdcDIB = CreateCompatibleDC(NULL);
+
+	// There is no RGBQUAD array for these formats: 24-bit-per-pixel or 32-bit-per-pixel
+	pbmi = _malloca(sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * colors);
+	if (!pbmi) {
+		DeleteDC(pdcDIB);
+		pdcDIB = NULL;
+		return -1;
+	}
+
+	bi = &pbmi->bmiHeader;
+	ZeroMemory(bi, sizeof(*bi));
+	bi->biSize = sizeof(BITMAPINFOHEADER);
+	bi->biWidth = width;
+	bi->biHeight = height;
+	bi->biPlanes = 1;
+	bi->biBitCount = 24;
+	bi->biCompression = BI_RGB;
+	if (cClrBits < 24)
+		bi->biClrUsed = 1UL << cClrBits;
+	bi->biSizeImage = 0; // = ((bi->biWidth * cClrBits + 31) & ~31) / 8 * bi->biHeight;
+
+	hbmpDIB = CreateDIBSection(pdcDIB, pbmi, DIB_RGB_COLORS, &pixels, NULL, 0);
+
+	if (!hbmpDIB) {
+		_freea(pbmi);
+		DeleteDC(pdcDIB);
+		pdcDIB = NULL;
+		return -1;
+	}
+
+	info("DIB %ux%u,%u", (int)bi->biWidth, (int)bi->biHeight, (int)bi->biBitCount);
+	_freea(pbmi);
+	return 0;
+}
+#endif
 
 static LRESULT CALLBACK
 win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -518,7 +580,16 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		hDC = GetWindowDC(hWnd);
 
-		create_glrc(hDC);
+#ifdef USE_ALPHA_DESKTOP
+		if (desktop_alpha) {
+			if (create_dib())
+				die("Unable to create DIB");
+			create_glrc(pdcDIB);
+		} else
+#endif
+		{
+			create_glrc(hDC);
+		}
 
 		break;
 
@@ -526,14 +597,19 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	case WM_PAINT:
-		// static PAINTSTRUCT ps;
-		// hDC = BeginPaint(hWnd, &ps);
-		// game_paint();
-		// if (desktop_alpha)
-		//   BitBlt(hDC, 0, 0, width, height, pdcDIB, 0, 0, SRCCOPY)
-		// else
-		//   SwapBuffers(hDC); // or maybe do nothing?
-		// EndPaint(hWnd, &ps);
+#ifdef USE_ALPHA_DESKTOP
+		if (desktop_alpha && pdcDIB) {
+			static PAINTSTRUCT ps;
+
+			hDC = BeginPaint(hWnd, &ps);
+			game_paint();
+			// if (width != bitmap_width || height != bitmap_height)
+			//	StretchDIBits(TODO);
+			// else
+			BitBlt(hDC, 0, 0, width, height, pdcDIB, 0, 0, SRCCOPY);
+			EndPaint(hWnd, &ps);
+		}
+#endif
 		return 0;
 
 	case WM_SIZE:
@@ -543,8 +619,15 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		wglDeleteContext(glrc);
 		glrc = 0;
 		hDC = GetWindowDC(hWnd);
-		create_glrc(hDC);
-		// TODO: need to share contexts ...
+#ifdef USE_ALPHA_DESKTOP
+		if (desktop_alpha) {
+			info("TODO: need to support resize");
+		} else
+#endif
+		{
+			// TODO: need to share contexts ...
+			create_glrc(hDC);
+		}
 		return 0;
 
 	case WM_KEYDOWN:
@@ -552,7 +635,7 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		break;
 
 	case WM_COMMAND: /* handles the hot-key accelerators we've defined */
-		pr_dbg("WM_COMMAND: %#x\n", LOWORD(wParam));
+		pr_dbg("WM_COMMAND: %#x", LOWORD(wParam));
 		switch (LOWORD(wParam)) {
 		case MY_DO_QUIT:
 			PostQuitMessage(0);
@@ -632,9 +715,11 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		/* Step 7. register real class */
 		ZeroMemory(&wc, sizeof(wc));
-#if USE_ALPHA_DESKTOP
+#ifdef USE_ALPHA_DESKTOP
 		// cannot use WS_EX_LAYERED if we are OWNDC
 		wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+		if (!desktop_alpha)
+			wc.style |= CS_OWNDC;
 #else
 		wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 #endif
@@ -650,11 +735,16 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		win_class = RegisterClass(&wc);
 
 		/* Step 8. create real window */
-#if USE_ALPHA_DESKTOP
-		exstyle = WS_EX_LAYERED;
-//		exstyle |= WS_EX_TRANSPARENT | WS_EX_COMPOSITED;
-		style = WS_OVERLAPPEDWINDOW;
-		// style = WS_POPUP;
+#ifdef USE_ALPHA_DESKTOP
+		if (desktop_alpha) {
+			exstyle = WS_EX_LAYERED;
+			// exstyle |= WS_EX_TRANSPARENT | WS_EX_COMPOSITED;
+			style = WS_OVERLAPPEDWINDOW;
+			// style = WS_POPUP;
+		} else {
+			exstyle = WS_EX_APPWINDOW;
+			style = WS_OVERLAPPEDWINDOW;
+		}
 #else
 		// exstyle = WS_EX_TRANSPARENT | WS_EX_APPWINDOW | WS_EX_COMPOSITED;
 		exstyle = WS_EX_APPWINDOW;
@@ -717,6 +807,8 @@ WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCm
 		{ (FVIRTKEY), VK_ESCAPE, MY_DO_QUIT },
 		{ (FALT | FVIRTKEY), VK_RETURN, MY_DO_TOGGLE_FULLSCREEN },
 	};
+	HACCEL ha;
+	MSG msg;
 
 	new_win();
 
@@ -724,9 +816,7 @@ WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCm
 //	ShowWindow(win, SW_SHOWNORMAL);
 	UpdateWindow(win);
 
-	HACCEL ha = CreateAcceleratorTable(acc, sizeof(acc) / sizeof(*acc));
-
-	MSG msg;
+	ha = CreateAcceleratorTable(acc, sizeof(acc) / sizeof(*acc));
 
 	/* don't render until window and gl context are created */
 	while (!win && !glrc) {
@@ -756,6 +846,9 @@ WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCm
 		if (!glrc)
 			info("No GL context!");
 
+#ifdef USE_ALPHA_DESKTOP
+		if (!desktop_alpha)
+#endif
 		if (win && glrc) {
 			game_paint();
 
