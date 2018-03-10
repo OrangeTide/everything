@@ -31,6 +31,9 @@ enum {
 void game_initialize(void);
 void game_paint(void);
 
+/* forward declarations needed internally */
+static void new_win(void);
+
 /** main window state **/
 static BOOL fullscreen = FALSE; // TODO: needs to be implemented
 static HGLRC glrc; /* gl context */
@@ -453,7 +456,7 @@ static void *load_proc(const char *name)
 }
 
 static void
-create_glrc(HDC hDC)
+create_glrc(HDC hDC, HGLRC old_glrc)
 {
 	INT ipf;
 	UINT num_formats_chosen;
@@ -489,8 +492,6 @@ create_glrc(HDC hDC)
 #endif
 	};
 
-	assert(hDC != NULL);
-
 	/* Step 9. set pixel format / wglChoosePixelFormatARB */
 	if (!wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen))
 		die("No matching pixel formats for OpenGL context");
@@ -499,7 +500,7 @@ create_glrc(HDC hDC)
 	SetPixelFormat(hDC, ipf, &pfd);
 
 	/* Step 10. create real context / wglCreateContextAttribsARB */
-	glrc = wglCreateContextAttribsARB(hDC, 0, ctx_attribs);
+	glrc = wglCreateContextAttribsARB(hDC, old_glrc, ctx_attribs);
 	if (!glrc)
 		die("Unable to create OpenGL context");
 
@@ -511,12 +512,14 @@ static LRESULT CALLBACK
 win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HDC hDC;
+	HGLRC old_glrc;
 
 	switch(uMsg) {
 	case WM_CREATE:
 		hDC = GetWindowDC(hWnd);
 
-		create_glrc(hDC);
+		create_glrc(hDC, 0);
+
 		break;
 
 	case WM_ERASEBKGND:
@@ -526,14 +529,17 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	case WM_SIZE:
+		hDC = GetWindowDC(hWnd);
+
 		width = LOWORD(lParam);
 		height = HIWORD(lParam);
+
+		// recreate the conext : I don't know why I'm doing this
 		wglMakeCurrent(NULL, NULL);
-		wglDeleteContext(glrc);
+		old_glrc = glrc;
 		glrc = 0;
-		hDC = GetWindowDC(hWnd);
-		// TODO: need to share contexts ...
-		create_glrc(hDC);
+		create_glrc(hDC, old_glrc);
+		wglDeleteContext(old_glrc);
 		return 0;
 
 	case WM_KEYDOWN:
@@ -549,7 +555,19 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case MY_DO_TOGGLE_FULLSCREEN:
 			fullscreen = !fullscreen;
 			info("TODO: toggle fullscreen / re-initialize GL context");
-			// TODO: initialize the GL context: create_glrc(hDC);
+
+			// old_win = win; /* save the old window to delete later */
+			// DestroyWindow(old_win);
+
+			// TODO: set width/height to the current screen
+			new_win();
+
+			hDC = GetWindowDC(hWnd);
+			wglMakeCurrent(NULL, NULL);
+			old_glrc = glrc;
+			glrc = 0;
+			create_glrc(hDC, old_glrc);
+			wglDeleteContext(old_glrc);
 			return 0;
 		}
 		break;
@@ -567,17 +585,49 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
+static void
+new_win(void)
+{
+	WNDCLASS wc;
+	ATOM win_class;
+	DWORD style;
+	DWORD exstyle;
+	RECT rect;
+
+	/* Step 7. register real class */
+	ZeroMemory(&wc, sizeof(wc));
+	wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc = win_proc;
+	// wc.cbClsExtra = 0;
+	// wc.cbWndExtra = 0;
+	wc.hInstance = GetModuleHandle(NULL);
+	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	// wc.hbrBackground = 0;
+	// wc.lpszMenuName = NULL;
+	wc.lpszClassName = "glWindowCls";
+	win_class = RegisterClass(&wc);
+
+	/* Step 8. create real window */
+	exstyle = WS_EX_APPWINDOW;
+	style = WS_OVERLAPPEDWINDOW;
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = width;
+	rect.bottom = height;
+	AdjustWindowRectEx(&rect, style, FALSE, exstyle);
+	// win = CreateWindow(MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
+	win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
+	if (exstyle & WS_EX_LAYERED)
+		SetLayeredWindowAttributes(win, 0, 128, LWA_ALPHA);
+}
+
 static LRESULT CALLBACK
 fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HDC hDC;
 	PIXELFORMATDESCRIPTOR pfd;
-	WNDCLASS wc;
-	ATOM win_class;
 	INT ipf;
-	DWORD style;
-	DWORD exstyle;
-	RECT rect;
 
 	if (uMsg == WM_CREATE) {
 		hDC = GetWindowDC(hWnd);
@@ -618,39 +668,14 @@ fake_win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		DestroyWindow(fake_win);
 		fake_win = 0;
 
-		/* Step 7. register real class */
-		ZeroMemory(&wc, sizeof(wc));
-		wc.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-		wc.lpfnWndProc = win_proc;
-		// wc.cbClsExtra = 0;
-		// wc.cbWndExtra = 0;
-		wc.hInstance = GetModuleHandle(NULL);
-		wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		// wc.hbrBackground = 0;
-		// wc.lpszMenuName = NULL;
-		wc.lpszClassName = "glWindowCls";
-		win_class = RegisterClass(&wc);
-
-		/* Step 8. create real window */
-		exstyle = WS_EX_APPWINDOW;
-		style = WS_OVERLAPPEDWINDOW;
-		rect.left = 0;
-		rect.top = 0;
-		rect.right = width;
-		rect.bottom = height;
-		AdjustWindowRectEx(&rect, style, FALSE, exstyle);
-		// win = CreateWindow(MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
-		win = CreateWindowEx(exstyle, MAKEINTATOM(win_class), "My GL window", style, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, wc.hInstance, NULL);
-		if (exstyle & WS_EX_LAYERED)
-			SetLayeredWindowAttributes(win, 0, 128, LWA_ALPHA);
+		new_win();
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
 static void
-new_win(void)
+new_fake_win(void)
 {
 	WNDCLASS fake_wc;
 	ATOM fake_win_class;
@@ -695,7 +720,7 @@ WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCm
 	HACCEL ha;
 	MSG msg;
 
-	new_win();
+	new_fake_win();
 
 	ShowWindow(win, nCmdShow);
 //	ShowWindow(win, SW_SHOWNORMAL);
