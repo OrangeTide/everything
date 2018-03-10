@@ -13,7 +13,6 @@
 #include <GL/glx.h>
 
 #include <X11/Xlib.h>
-#include <X11/extensions/Xrender.h>
 
 void game_initialize(void);
 void game_paint(void);
@@ -59,7 +58,6 @@ borisgl_initialize(int width, int height, const char *title)
 	XVisualInfo *xvi;
 	int fbcount;
 	GLXFBConfig *fbconfiglist, fbconfig;
-	XRenderPictFormat *pict;
 	int i;
 	const int glx_attribs[] = {
 		GLX_X_RENDERABLE, True,
@@ -104,13 +102,8 @@ borisgl_initialize(int width, int height, const char *title)
 		xvi = glXGetVisualFromFBConfig(dpy, fbconfiglist[i]);
 		if (!xvi)
 			continue;
-		pict = XRenderFindVisualFormat(dpy, xvi->visual);
-		if (!pict)
-			continue;
-		if (pict->direct.alphaMask > 0) {
-			fbconfig = fbconfiglist[i];
-			goto found_fbconfig;
-		}
+		fbconfig = fbconfiglist[i];
+		goto found_fbconfig;
 	}
 	pr_err("No valid FB configurations");
 	return 1;

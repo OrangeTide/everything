@@ -108,7 +108,7 @@ game_initialize(void)
 void
 game_paint(void)
 {
-	glClearColor(0.2, 0.5, 0.2, 0.5);
+	glClearColor(0.2, 0.5, 0.2, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	GLfloat triangle[] = {0.0f,  0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,  0.0f};
