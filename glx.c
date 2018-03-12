@@ -3,19 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
-#define USE_GLES2 0
-
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
-#include <GL/glu.h>
 #include <GL/glx.h>
-
 #include <X11/Xlib.h>
 
-void game_initialize(void);
-void game_paint(void);
+#define USE_GLES2 0
 
 static Display *dpy;
 static Atom wm_delete_window, wm_protocols;
@@ -233,7 +226,7 @@ borisgl_loop(void)
 				break;
 			}
 		}
-		nanosleep(1000000);
+		sleep(1);
 	}
 }
 
@@ -267,7 +260,3 @@ main(int argc, char **argv)
 
 	return 0;
 }
-
-/****************************************************************************/
-
-#include "tridemo.c"

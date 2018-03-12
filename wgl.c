@@ -768,5 +768,3 @@ WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCm
 
 	return msg.wParam;
 }
-
-#include "tridemo.c"

@@ -1,5 +1,6 @@
-#include <GL/glu.h>
 #include "jdm_embed.h"
+#define JDM_GAMEGL_IMPLEMENTATION
+#include "jdm_gamegl.h"
 
 #if USE_GLES2
 JDM_EMBED_FILE(fragment_source, "basic-es2.frag");
