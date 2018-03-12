@@ -1,4 +1,5 @@
-/* tridemo.c : example program to draw a triangle - public domain */
+/* spin.c : example program to draw a cube - public domain */
+#include <math.h>
 #include "jdm_embed.h"
 #define JDM_GAMEGL_IMPLEMENTATION
 #include "jdm_gamegl.h"
@@ -6,12 +7,46 @@
 #include "jdm_utilgl.h"
 
 #if USE_GLES2
-JDM_EMBED_FILE(fragment_source, "basic-es2.frag");
-JDM_EMBED_FILE(vertex_source, "basic-es2.vert");
+JDM_EMBED_FILE(fragment_source, "flat-es2.frag");
+JDM_EMBED_FILE(vertex_source, "flat-es2.vert");
 #else
-JDM_EMBED_FILE(fragment_source, "basic.frag");
-JDM_EMBED_FILE(vertex_source, "basic.vert");
+JDM_EMBED_FILE(fragment_source, "flat.frag");
+JDM_EMBED_FILE(vertex_source, "flat.vert");
 #endif
+
+void
+mat4_identity(GLfloat out[4*4])
+{
+	out[0] = 1.0f; out[1] = 0; out[2] = 0; out[3] = 0;
+	out[4] = 0; out[5] = 1.0f; out[6] = 0; out[7] = 0;
+	out[8] = 0; out[9] = 0; out[10] = 1.0f; out[11] = 0;
+	out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1.0f;
+}
+
+void
+mat4_perspective(GLfloat out[4*4], GLfloat fovy, GLfloat aspect, GLfloat znear, GLfloat zfar)
+{
+	GLfloat f = tan(M_PI / 2 - fovy / 2);
+	out[0] = aspect > 1e-10 ? f / aspect : 1e10;
+	out[1] = 0;
+	out[2] = 0;
+	out[3] = 0;
+
+	out[4] = 0;
+	out[5] = f;
+	out[6] = 0;
+	out[7] = 0;
+
+	out[8] = 0;
+	out[9] = 0;
+	out[10] = (zfar + znear) / (znear - zfar);
+	out[11] = -1.0f;
+
+	out[12] = 0;
+	out[13] = 0;
+	out[14] = (2.0f * zfar * znear) / (znear - zfar);
+	out[15] = 0;
+}
 
 static GLuint my_shader_program;
 
@@ -65,10 +100,12 @@ game_initialize(void)
 void
 game_paint(void)
 {
+	// TODO: update state
+
 	glClearColor(0.2, 0.5, 0.2, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	GLfloat triangle[] = {0.0f,  0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,  0.0f};
+	GLfloat triangle[] = {0.0f,  0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,  0.0f}; // TODO: make a cube
 	GLfloat tricolor[][3] = { {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f} };
 
 	glUseProgram(my_shader_program);
@@ -80,6 +117,20 @@ game_paint(void)
 #	define vposition_loc 0
 #	define vcolor_loc 1
 #endif
+
+	GLint mvp_loc = glGetUniformLocation(my_shader_program, "MVP");
+	if (mvp_loc < 0)
+		info("WARNING:mvp_loc=%d", mvp_loc);
+
+	/* simple identity matrix */
+	if (mvp_loc >= 0) {
+		GLfloat mvp[16];
+		mat4_identity(mvp);
+		// TODO: mat4_perspective(mvp, 90, 0.75, 1, 40);
+		glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, mvp);
+	}
+
+	/* setup vertex data */
 	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, 0, triangle);
 	glVertexAttribPointer(vcolor_loc, 3, GL_FLOAT, GL_FALSE, 0, tricolor);
 	glEnableVertexAttribArray(vposition_loc);

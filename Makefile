@@ -9,14 +9,14 @@ ifeq ($(OS),Windows_NT)
 	RM = del
 	CC = gcc
 	CFLAGS += -mwindows
-	## TODO: look up packages through PKGCFLAGS/PKGLIBS. don't use pkg-config.
 	pkg-config-cflags = $(foreach pkg,$(1),$$(PKGCFLAGS.$(pkg)))
 	pkg-config-libs = $(foreach pkg,$(1),$$(PKGLIBS.$(pkg)))
 	CFLAGS = -mwindows -Wall -W -Og -ggdb
 else ifeq ($(OS),Linux)
-	## TODO: first look up packages through PKGCFLAGS/PKGLIBS. then fall back to pkg-config.
-	pkg-config-cflags = $(shell pkg-config --cflags $(1))
-	pkg-config-libs = $(shell pkg-config --libs $(1))
+	# first look up packages through PKGCFLAGS/PKGLIBS.
+	# if not found, then fall back to pkg-config.
+	pkg-config-cflags = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGCFLAGS.$(pkg)),$$(shell pkg-config --cflags $(pkg))))
+	pkg-config-libs = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGLIBS.$(pkg)),$$(shell pkg-config --libs $(pkg))))
 	CC = gcc
 	CFLAGS = -Wall -W -Og -ggdb
 #TODO: include packages from *.mkpkg files
@@ -45,8 +45,11 @@ else ifeq ($(OS),Linux)
 	PKGLIBS.mintaro = -lX11 -lXext -lasound -lpthread -lm
 	PKGCLFAGS.mintaro =
 	# Libraries for Curses
-	PKGLIBS.curses = $shell pkg-config --libs ncurses)
+	PKGLIBS.curses = $(shell pkg-config --libs ncurses)
 	PKGCFLAGS.curses = $(shell pkg-config --cflags ncurses)
+	# Libraries for math
+	PKGLIBS.m = -lm
+	PKGCFLAGS.m =
 endif
 
 # include all targets

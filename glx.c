@@ -7,6 +7,7 @@
 
 #include <GL/glx.h>
 #include <X11/Xlib.h>
+#include <unistd.h>
 
 #define USE_GLES2 0
 
