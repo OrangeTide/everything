@@ -25,7 +25,7 @@
  *   prints an error, and may show a message box that blocks.
  * void die(const char *msg)
  *   terminates the program with a message
- * void info(const char *fmt, ...);
+ * void pr_info(const char *fmt, ...);
  *   prints a formatted string
  * void pr_dbg(const char *fmt, ...);
  *   prints a formmated string if not compiled with NDEBUG defined

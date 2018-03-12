@@ -179,10 +179,8 @@ GEN_GL_PROC(glCreateShader, PFNGLCREATESHADERPROC, GLuint, (GLenum type), (type)
 GEN_GL_VOID_PROC(glDeleteProgram, PFNGLDELETEPROGRAMPROC, (GLuint program), (program));
 GEN_GL_VOID_PROC(glDeleteShader, PFNGLDELETESHADERPROC, (GLuint shader), (shader));
 GEN_GL_VOID_PROC(glDetachShader, PFNGLDETACHSHADERPROC, (GLuint program, GLuint shader), (program, shader));
-#if 0 // TODO
-GEN_GL_PROC(glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAYPROC, void, (GLuint index));
-GEN_GL_PROC(glDrawBuffers, PFNGLDRAWBUFFERSPROC, void, (GLsizei n, const GLenum * bufs));
-#endif
+GEN_GL_VOID_PROC(glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAYPROC, (GLuint index), (index));
+GEN_GL_VOID_PROC(glDrawBuffers, PFNGLDRAWBUFFERSPROC, (GLsizei n, const GLenum * bufs), (n, bufs));
 GEN_GL_VOID_PROC(glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAYPROC, (GLuint index), (index));
 #if 0 // TODO
 GEN_GL_PROC(glGetActiveAttrib, PFNGLGETACTIVEATTRIBPROC, void, (GLuint program, GLuint index, GLsizei bufSize, GLsizei * length, GLint * size, GLenum * type, GLchar * name));
@@ -228,10 +226,10 @@ GEN_GL_PROC(glUniform4f, PFNGLUNIFORM4FPROC, void, (GLint location, GLfloat v0, 
 GEN_GL_PROC(glUniform4fv, PFNGLUNIFORM4FVPROC, void, (GLint location, GLsizei count, const GLfloat * value));
 GEN_GL_PROC(glUniform4i, PFNGLUNIFORM4IPROC, void, (GLint location, GLint v0, GLint v1, GLint v2, GLint v3));
 GEN_GL_PROC(glUniform4iv, PFNGLUNIFORM4IVPROC, void, (GLint location, GLsizei count, const GLint * value));
-GEN_GL_PROC(glUniformMatrix2fv, PFNGLUNIFORMMATRIX2FVPROC, void, (GLint location, GLsizei count, GLboolean transpose, const GLfloat * value));
-GEN_GL_PROC(glUniformMatrix3fv, PFNGLUNIFORMMATRIX3FVPROC, void, (GLint location, GLsizei count, GLboolean transpose, const GLfloat * value));
-GEN_GL_PROC(glUniformMatrix4fv, PFNGLUNIFORMMATRIX4FVPROC, void, (GLint location, GLsizei count, GLboolean transpose, const GLfloat * value));
 #endif
+GEN_GL_VOID_PROC(glUniformMatrix2fv, PFNGLUNIFORMMATRIX2FVPROC, (GLint location, GLsizei count, GLboolean transpose, const GLfloat * value), (location, count, transpose, value));
+GEN_GL_VOID_PROC(glUniformMatrix3fv, PFNGLUNIFORMMATRIX3FVPROC, (GLint location, GLsizei count, GLboolean transpose, const GLfloat * value), (location, count, transpose, value));
+GEN_GL_VOID_PROC(glUniformMatrix4fv, PFNGLUNIFORMMATRIX4FVPROC, (GLint location, GLsizei count, GLboolean transpose, const GLfloat * value), (location, count, transpose, value));
 GEN_GL_VOID_PROC(glUseProgram, PFNGLUSEPROGRAMPROC, (GLuint program), (program));
 #if 0 // TODO
 GEN_GL_PROC(glValidateProgram, PFNGLVALIDATEPROGRAMPROC, void, (GLuint program));
@@ -418,7 +416,7 @@ pr_err(const char *fmt, ...)
 }
 
 static void
-info(const char *fmt, ...)
+pr_info(const char *fmt, ...)
 {
 	char msg[256];
 	va_list ap;
@@ -495,7 +493,7 @@ create_glrc(HDC hDC, HGLRC old_glrc)
 	/* Step 9. set pixel format / wglChoosePixelFormatARB */
 	if (!wglChoosePixelFormatARB(hDC, pix_attribs, NULL, 1, &ipf, &num_formats_chosen))
 		die("No matching pixel formats for OpenGL context");
-	info("pf=%d num_formats_chosen=%d", (int)ipf, (int)num_formats_chosen);
+	pr_info("pf=%d num_formats_chosen=%d", (int)ipf, (int)num_formats_chosen);
 	DescribePixelFormat(hDC, ipf, sizeof(pfd), &pfd);
 	SetPixelFormat(hDC, ipf, &pfd);
 
@@ -554,7 +552,7 @@ win_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return 0;
 		case MY_DO_TOGGLE_FULLSCREEN:
 			fullscreen = !fullscreen;
-			info("TODO: toggle fullscreen / re-initialize GL context");
+			pr_info("TODO: toggle fullscreen / re-initialize GL context");
 
 			// old_win = win; /* save the old window to delete later */
 			// DestroyWindow(old_win);
@@ -752,9 +750,9 @@ WinMain(HINSTANCE hInstance _unused, HINSTANCE hPrevInstance _unused, LPSTR lpCm
 		}
 
 		if (!win)
-			info("No Window!");
+			pr_info("No Window!");
 		if (!glrc)
-			info("No GL context!");
+			pr_info("No GL context!");
 
 		if (win && glrc) {
 			game_paint();

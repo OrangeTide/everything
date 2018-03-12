@@ -7,9 +7,10 @@
 
 #include <GL/glx.h>
 #include <X11/Xlib.h>
-#include <unistd.h>
 
 #define USE_GLES2 0
+
+#define _unused __attribute__((unused))
 
 static Display *dpy;
 static Atom wm_delete_window, wm_protocols;
@@ -17,7 +18,7 @@ static Window win;
 static GLXContext ctx;
 
 static void
-info(const char *fmt, ...)
+pr_info(const char *fmt, ...)
 {
 	va_list ap;
 	char msg[256];
@@ -43,6 +44,24 @@ pr_err(const char *fmt, ...)
 	strcat(msg, "\n");
 	fputs(msg, stderr);
 }
+
+#if NDEBUG
+#define pr_dbg(...) do { /* nothing */ } while(0)
+#else
+static void
+pr_dbg(const char *fmt, ...) _unused;
+static void
+pr_dbg(const char *fmt, ...)
+{
+	char msg[256];
+	va_list ap;
+	va_start(ap, fmt);
+	strcpy(msg, "DEBUG:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
+	va_end(ap);
+	puts(msg);
+}
+#endif
 
 static bool
 borisgl_initialize(int width, int height, const char *title)
@@ -170,8 +189,8 @@ found_fbconfig:
 	XSync(dpy, False);
 	glXMakeCurrent(dpy, win, ctx);
 
-	info("GL_VERSION=%s", glGetString(GL_VERSION));
-	info("GL_RENDERER=%s", glGetString(GL_RENDERER));
+	pr_info("GL_VERSION=%s", glGetString(GL_VERSION));
+	pr_info("GL_RENDERER=%s", glGetString(GL_RENDERER));
 #if 0 // not supported/broken on one of my systems
 	GLint gl_major = 0, gl_minor = 0;
 	glGetIntegerv(GL_MAJOR_VERSION, &gl_major);
@@ -227,7 +246,6 @@ borisgl_loop(void)
 				break;
 			}
 		}
-		sleep(1);
 	}
 }
 
@@ -250,7 +268,7 @@ borisgl_cleanup(void)
 }
 
 int
-main(int argc, char **argv)
+main()
 {
 	if (!borisgl_initialize(640, 480, "game"))
 		return 1;
