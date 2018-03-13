@@ -130,7 +130,10 @@ found_fbconfig:
 	wattr.border_pixel = 0;
 	wattr.colormap = XCreateColormap(dpy, root, xvi->visual, AllocNone);
 
-	win = XCreateWindow (dpy, root, 0, 0, width, height, 0, xvi->depth, InputOutput, xvi->visual, CWBackPixmap | CWBorderPixel | CWColormap | CWEventMask, &wattr);
+	win = XCreateWindow(dpy, root,
+			(DisplayWidth(dpy, screen) - width) / 2, (DisplayHeight(dpy, screen) - height) / 2,
+			width, height, 0, xvi->depth, InputOutput, xvi->visual,
+			CWBackPixmap | CWBorderPixel | CWColormap | CWEventMask, &wattr);
 
 	if (!win) {
 		pr_err("Unable to create window");
