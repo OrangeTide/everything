@@ -257,9 +257,9 @@ game_paint(void)
 
 	// TODO: make a cube
 	GLfloat triangle[][3] = {
-		{0.0f,  0.5f, -0.5f},
-		{-0.5f, -0.5f, -0.5f - z_tick},
-		{0.5f, -0.5f,  -0.5f}
+		{0.0f,  0.5f, 0.0f},
+		{-0.5f, -0.5f, 0.0f},
+		{0.5f, -0.5f,  0.0f}
 	};
 	GLfloat tricolor[][3] = {
 		{0.0f, 0.0f, 1.0f},
@@ -294,13 +294,9 @@ game_paint(void)
 
 	GLfloat modelview[16], tmp[16], proj[16];
 
-//	mat4_identity(modelview);
-//	mat4_translate(tmp, vec3_new(0.0f, 0.0f, -1.0f));
-//	mat4_mul(modelview, tmp);
-//	mat4_rotate(tmp, a_tick, vec3_new(0.0f, 0.0f, 1.0f));
-//	mat4_mul(modelview, tmp);
-
 	mat4_rotate(modelview, a_tick, vec3_new(0.0f, 0.0f, 1.0f));
+	mat4_translate(tmp, vec3_new(0.0f, 0.0f, -0.5f - z_tick));
+	mat4_mul(modelview, tmp);
 
 	// mat4_identity(proj);
 	mat4_perspective(proj, 90.0f, 0.75f, 0.05f, 400.0f);

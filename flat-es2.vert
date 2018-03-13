@@ -17,5 +17,5 @@ void main()
 {
 	Color = vColor;
 	fragNormal = vNormal * mat3(modelview);
-	gl_Position = modelview * projection * vPosition;
+	gl_Position = projection * modelview * vec4(vPosition, 1.0);
 }
