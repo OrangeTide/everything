@@ -255,22 +255,28 @@ game_paint(void)
 	glClearColor(0.53, 0.80, 0.92, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// TODO: make a cube
-	GLfloat triangle[][3] = {
-		{0.0f,  0.5f, 0.0f},
-		{-0.5f, -0.5f, 0.0f},
-		{0.5f, -0.5f,  0.0f}
+	// TODO: make a cube instead of just a square
+	GLfloat cube_vertex[][3] = {
+		{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f,  0.0f},
+		{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {-0.5f, 0.5f,  0.0f},
 	};
-	GLfloat tricolor[][3] = {
+	GLfloat cubecolor[][3] = {
 		{0.0f, 0.0f, 1.0f},
 		{1.0f, 0.0f, 0.0f},
-		{0.0f, 1.0f, 0.0f}
+		{0.0f, 1.0f, 0.0f},
+		{0.0f, 0.0f, 1.0f},
+		{1.0f, 0.0f, 0.0f},
+		{0.8f, 0.8f, 0.8f},
 	};
-	GLfloat trinormal[][3] = {
+	GLfloat cube_normal[][3] = {
 		{0.0f, 0.0f, -1.0f},
 		{0.0f, 0.0f, -1.0f},
-		{0.0f, 0.0f, -1.0f}
+		{0.0f, 0.0f, -1.0f},
+		{0.0f, 0.0f, -1.0f},
+		{0.0f, 0.0f, -1.0f},
+		{0.0f, 0.0f, -1.0f},
 	};
+	unsigned mesh_elements = sizeof(cube_vertex) / sizeof(*cube_vertex);
 
 	glUseProgram(my_shader_program);
 
@@ -287,7 +293,10 @@ game_paint(void)
 	GLint modelview_loc = glGetUniformLocation(my_shader_program, "modelview");
 	GLint proj_loc = glGetUniformLocation(my_shader_program, "projection");
 
-	if (modelview_loc < 0 || proj_loc < 0 || vnormal_loc < 0) {
+	/* vertex and matrix data is required.
+	 * color and normal are optional. (but I do not test that case)
+	 */
+	if (modelview_loc < 0 || proj_loc < 0 || vposition_loc < 0) {
 		pr_info("WARNING:modelview_loc=%d proj_loc=%d vposition_loc=%d vcolor_loc=%d vnormal_loc=%d", modelview_loc, proj_loc, vposition_loc, vcolor_loc, vnormal_loc);
 		return;
 	}
@@ -305,11 +314,11 @@ game_paint(void)
 	glUniformMatrix4fv(proj_loc, 1, GL_FALSE, proj);
 
 	/* setup vertex data */
-	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, 0, triangle);
+	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, 0, cube_vertex);
 	if (vcolor_loc >= 0)
-		glVertexAttribPointer(vcolor_loc, 3, GL_FLOAT, GL_FALSE, 0, tricolor);
+		glVertexAttribPointer(vcolor_loc, 3, GL_FLOAT, GL_FALSE, 0, cubecolor);
 	if (vnormal_loc >= 0)
-		glVertexAttribPointer(vnormal_loc, 3, GL_FLOAT, GL_FALSE, 0, trinormal);
+		glVertexAttribPointer(vnormal_loc, 3, GL_FLOAT, GL_FALSE, 0, cube_normal);
 
 	glEnableVertexAttribArray(vposition_loc);
 	if (vcolor_loc >= 0)
@@ -317,7 +326,7 @@ game_paint(void)
 	if (vnormal_loc >= 0)
 		glEnableVertexAttribArray(vnormal_loc);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glDrawArrays(GL_TRIANGLES, 0, mesh_elements);
 
 	glDisableVertexAttribArray(vposition_loc);
 	if (vcolor_loc >= 0)
