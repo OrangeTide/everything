@@ -22,7 +22,7 @@ Linux:
 
 To build Windows/wine from Linux:
 ```
-make OS=Windows_NT CC=x86_64-w64-mingw32-gcc
+make OS=Windows_NT RM=rm CC=x86_64-w64-mingw32-gcc
 ```
 
 ## Running the Tests
