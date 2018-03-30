@@ -1,7 +1,11 @@
+.*.swp
+.*~
+
 *.o
 *.a
 *.so
-*.lib
+
 *.exe
-.*.swp
-.*~
+*.lib
+*.dll
+*.res

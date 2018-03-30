@@ -1,17 +1,28 @@
 ## OS detection
+ifeq ($(HOSTOS),)
+	HOSTOS := $(shell uname -s)
+endif
 ifeq ($(OS),)
-OS := $(shell uname -s)
+	OS := $(HOSTOS)
 endif
 
 ## Platform specific options
 ifeq ($(OS),Windows_NT)
 	X = .exe
-	RM = del
-	CC = gcc
 	CFLAGS += -mwindows
 	pkg-config-cflags = $(foreach pkg,$(1),$$(PKGCFLAGS.$(pkg)))
 	pkg-config-libs = $(foreach pkg,$(1),$$(PKGLIBS.$(pkg)))
 	CFLAGS = -mwindows -Wall -W -Og -ggdb
+ifeq ($(HOSTOS),Linux)
+	# based on my own cross-compile setup
+	WINDRES = x86_64-w64-mingw32-windres
+	CC = x86_64-w64-mingw32-gcc
+	RM = rm -f
+else
+	WINDRES = windres
+	CC = gcc
+	RM = del
+endif
 else ifeq ($(OS),Linux)
 	# first look up packages through PKGCFLAGS/PKGLIBS.
 	# if not found, then fall back to pkg-config.
@@ -86,6 +97,11 @@ all :: $($1.EXEC)
 clean ::
 	$(RM) $$($1.EXEC) $$($1.OBJS)
 endef
+
+ifeq ($(OS),Windows_NT)
+%.res : %.rc
+	$(WINDRES) $< -O coff -o $@
+endif
 
 $(eval $(foreach target,$(TARGETS),$(call process-config,$(target))))
 

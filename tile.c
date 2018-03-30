@@ -6,15 +6,17 @@
 #include <windowsx.h>
 #include <stdio.h>
 
-#include "font8x8.xbm"
-#include "font8x16.xbm"
-#include "font16x16.xbm"
+#include "jdm_embed.h"
+
+JDM_EMBED_FILE(font8x8_bmp, "font8x8.bmp");
+JDM_EMBED_FILE(font8x16_bmp, "font8x16.bmp");
+JDM_EMBED_FILE(font16x16_bmp, "font16x16.bmp");
 
 // TODO: support dynamically setting this
-#define MY_TILE_WIDTH 40
+#define MY_TILE_WIDTH 80
 #define MY_TILE_HEIGHT 30
 
-static unsigned font_tile_width = 16; // TODO: dynamically set this
+static unsigned font_tile_width = 8; // TODO: dynamically set this
 static unsigned font_tile_height = 16; // TODO: dynamically set this
 static HDC hDCMem;
 static HBITMAP fntbitmap;
@@ -93,12 +95,36 @@ void report_error(const char *f, ...)
 		MessageBox(NULL, _T("Unknown Error"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
 }
 
-static void
-font_use(HDC hdc, void *bits, int width, int height)
+static const void *
+font_load(const void *bmpdata, int *out_width, int *out_height)
 {
+	const void *bits;
+	int width, height;
+
+	bits = (const char*)bmpdata + *(DWORD*)((char*)bmpdata + 10);
+
+	width = *(DWORD*)((char*)bmpdata + 18),
+	height = *(DWORD*)((char*)bmpdata + 22);
+
 	font_tile_width = width / 32;
 	font_tile_height = height / 8;
+
+	if (out_width)
+		*out_width = width;
+	if (out_height)
+		*out_height = height;
 	
+	return bits;
+}
+
+static void
+font_use(HDC hdc, const void *bmpdata)
+{
+	const void *bits;
+	int width, height;
+
+	bits = font_load(bmpdata, &width, &height);
+
 	hDCMem = CreateCompatibleDC(hdc);
 #if 0 // TODO: this routine seems broken
 	LPBITMAPINFO pbmi;
@@ -141,8 +167,8 @@ do_paint(struct tile_window *tilewin, HDC hdc, RECT *rcUpdate)
 
 	// TODO: fix bit order issue with XBMs
 	// font_use(hdc, font8x16_bits, font8x16_width, font8x16_height);
-	font_use(hdc, font16x16_bits, font16x16_width, font16x16_height);
-	
+	font_use(hdc, font8x16_bmp);
+
 	HGDIOBJ oldbmp = SelectObject(hDCMem, fntbitmap);
 	
 	for (y = 0; y < screen_h; y++) {
@@ -272,6 +298,8 @@ init(int nCmdShow)
 	if (load())
 		return 1;
 	
+	font_load(font8x16_bmp, NULL, NULL);
+
 	HWND mywin = new_window();
 	ShowWindow(mywin, nCmdShow);
 	UpdateWindow(mywin);
