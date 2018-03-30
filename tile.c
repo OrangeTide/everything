@@ -202,6 +202,7 @@ workspaceWindowProc(
 	
 	switch (uMsg) {
 	case WM_CREATE:
+		// ShowCursor(TRUE);
 		// CREATESTRUCT *pCreate = (CREATESTRUCT*)lParam;
 		// SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)pCreate->lpCreateParams);
 		tilewin = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, tile_window_size(MY_TILE_WIDTH, MY_TILE_HEIGHT));
@@ -266,6 +267,8 @@ new_window(void)
 		wc.lpfnWndProc = workspaceWindowProc;
 		wc.hInstance = hInstance;
 		wc.lpszClassName = lpszClassName;
+		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(0));
 		aWndClass = RegisterClass(&wc);
 	}
 	
