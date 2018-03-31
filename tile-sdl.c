@@ -1,4 +1,5 @@
 /* tile-sdl.c : draws a tiles display - public domain. */
+#include <stdbool.h>
 #include <SDL2/SDL.h>
 
 #include "jdm_embed.h"
@@ -6,12 +7,15 @@
 JDM_EMBED_FILE(sheet1_bmp, "assets/sheet1.bmp");
 
 #define TILES_PER_ROW 32
+#define TILE_WIDTH 8
+#define TILE_HEIGHT 8
 
-static int out_width, out_height;
-// , out_scale = 2; // TODO: handle scaling
+static int out_width, out_height, out_scale;
+static int screen_width, screen_height;
 static SDL_Window *main_win;
 static SDL_Renderer *main_ren;
 static SDL_Texture *sheet1_tex;
+static bool fullscreen;
 
 static const SDL_Color vga_pal[16] = {
 	{ 0, 0, 0, 0 },
@@ -48,6 +52,8 @@ paint(void)
 	dst.y = 64;
 	dst.w = src.w;
 	dst.h = src.h;
+
+	SDL_RenderSetScale(main_ren, out_scale, out_scale);
 
 	/* clear screen to brown */
 	SDL_SetRenderDrawColor(main_ren, 170, 85, 0, SDL_ALPHA_OPAQUE); // border color
@@ -101,8 +107,12 @@ init(void)
 		return 1;
 	}
 
-	out_width = 640;
-	out_height = 480;
+	screen_width = 80;
+	screen_height = 60;
+	out_scale = 2;
+	out_width = out_scale * screen_width * TILE_WIDTH;
+	out_height = out_scale * screen_height * TILE_HEIGHT;
+	fullscreen = false;
 
 	main_win = SDL_CreateWindow("Tile",
 		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -131,7 +141,22 @@ loop(void)
 		}
 		switch (e.type) {
 		case SDL_QUIT:
-			return;
+			return; /* quit! */
+		case SDL_KEYDOWN:
+			switch (e.key.keysym.sym) {
+			case SDLK_ESCAPE:
+				// TODO: prompt before exiting
+				return; /* quit! */
+			case SDLK_F11: /* fullscreen */
+				fullscreen = !fullscreen;
+				if (fullscreen)
+					SDL_SetWindowFullscreen(main_win,
+							SDL_WINDOW_FULLSCREEN_DESKTOP);
+				else
+					SDL_SetWindowFullscreen(main_win, 0);
+				break;
+			}
+			break;
 		}
 	}
 }
