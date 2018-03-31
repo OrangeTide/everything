@@ -12,33 +12,29 @@ JDM_EMBED_FILE(font8x8_bmp, "font8x8.bmp");
 JDM_EMBED_FILE(font8x16_bmp, "font8x16.bmp");
 JDM_EMBED_FILE(font16x16_bmp, "font16x16.bmp");
 
-// TODO: support dynamically setting this
-#define MY_TILE_WIDTH 80
-#define MY_TILE_HEIGHT 30
-
-static unsigned font_tile_width = 8; // TODO: dynamically set this
-static unsigned font_tile_height = 16; // TODO: dynamically set this
-static HDC hDCMem;
+static unsigned 
+	font_tile_width, font_tile_height,
+	screen_width, screen_height,
+	out_width, out_height;
 static HBITMAP fntbitmap;
-static unsigned screen_w = MY_TILE_WIDTH, screen_h = MY_TILE_HEIGHT;
 
-static const COLORREF pal[16] = {
-	RGB(0, 0, 0),
-	RGB(0, 0, 170),
-	RGB(0, 170, 0),
-	RGB(0, 170, 170),
-	RGB(170, 0, 0),
-	RGB(170, 0, 170),
-	RGB(170, 85, 0),
-	RGB(170, 170, 170),
-	RGB(85, 85, 85),
-	RGB(85, 85, 255),
-	RGB(85, 255, 85),
-	RGB(85, 255, 255),
-	RGB(255, 85, 85),
-	RGB(255, 85, 255),
-	RGB(255, 255, 85),
-	RGB(255, 255, 255),
+static const RGBQUAD pal[16] = {
+	{ 0, 0, 0, 0 },
+	{ 0, 0, 170, 0 },
+	{ 0, 170, 0, 0 },
+	{ 0, 170, 170, 0 },
+	{ 170, 0, 0, 0 },
+	{ 170, 0, 170, 0 },
+	{ 170, 85, 0, 0 },
+	{ 170, 170, 170, 0 },
+	{ 85, 85, 85, 0 },
+	{ 85, 85, 255, 0 },
+	{ 85, 255, 85, 0 },
+	{ 85, 255, 255, 0 },
+	{ 255, 85, 85, 0 },
+	{ 255, 85, 255, 0 },
+	{ 255, 255, 85, 0 },
+	{ 255, 255, 255, 0 },
 };
 
 struct tile_info {
@@ -71,7 +67,7 @@ tile_window_init(struct tile_window *tilewin, unsigned w, unsigned h)
 		for (x = 0; x < w; x++, ti++) {
 			ti->fg = rand() % 16;
 			ti->bg = rand() % 16;
-			ti->ch = ' ' + rand() % 95;
+			ti->ch = ' ' + (rand() % 95);
 		}
 	}
 }
@@ -118,75 +114,97 @@ font_load(const void *bmpdata, int *out_width, int *out_height)
 }
 
 static void
-font_use(HDC hdc, const void *bmpdata)
+font_done(void)
 {
-	const void *bits;
-	int width, height;
-
-	bits = font_load(bmpdata, &width, &height);
-
-	hDCMem = CreateCompatibleDC(hdc);
-#if 0 // TODO: this routine seems broken
-	LPBITMAPINFO pbmi;
-	WORD nColors = 256;
-	
-	pbmi = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(BITMAPINFO) + nColors * sizeof(RGBQUAD));
-	ZeroMemory(pbmi, sizeof(BITMAPINFO) + nColors * sizeof(RGBQUAD));
-	pbmi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	pbmi->bmiHeader.biWidth = width;
-	pbmi->bmiHeader.biHeight = -height;
-	pbmi->bmiHeader.biPlanes = 1;
-	pbmi->bmiHeader.biBitCount = 1;
-	pbmi->bmiHeader.biCompression = BI_RGB;
-	WORD *pColor = (WORD*)((LPSTR)pbmi + (WORD)(pbmi->bmiHeader.biSize));
-	pColor[0] = 1;
-	pColor[1] = 2;
-
-	fntbitmap = CreateDIBSection (hDCMem, pbmi, DIB_PAL_COLORS, (void**)&font16x16_bits, NULL, 0);
-	
-	HeapFree(GetProcessHeap(), 0, pbmi);
-#else
-	//void *bits = *pbits;
-	fntbitmap = CreateBitmap(width, height, 1, 1, bits);
-#endif
+	DeleteObject(fntbitmap);
+	fntbitmap = NULL;
 }
 
 static void
-font_done(void)
-{
-		DeleteDC(hDCMem);
-        DeleteObject(fntbitmap);
+font_use(const void *bmpdata)
+{	
+	const void *fontbits;
+	int width, height;
+	struct { 
+		BITMAPINFOHEADER bmiHeader;
+		RGBQUAD bmiColors[256];
+	} dbmi; /* BITMAPINFO but with pre-allocated bmiColors[] array */
+	void *pixels;
+	
+	if (fntbitmap)
+		font_done();
+	
+	fontbits = font_load(bmpdata, &width, &height);
+
+	ZeroMemory(&dbmi, sizeof(dbmi));  
+	dbmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	dbmi.bmiHeader.biWidth = width;
+	dbmi.bmiHeader.biHeight  = height;
+	dbmi.bmiHeader.biPlanes = 1;
+	dbmi.bmiHeader.biBitCount = 1;
+	dbmi.bmiHeader.biCompression  = BI_RGB;
+	dbmi.bmiHeader.biSizeImage = 0;
+	dbmi.bmiHeader.biXPelsPerMeter = 3780;
+	dbmi.bmiHeader.biYPelsPerMeter = 3780;
+	dbmi.bmiHeader.biClrUsed = 2;
+	dbmi.bmiHeader.biClrImportant = 0;
+	
+	dbmi.bmiColors[0].rgbBlue = 255;
+	dbmi.bmiColors[0].rgbGreen = 255;
+	dbmi.bmiColors[0].rgbRed = 255;
+	dbmi.bmiColors[0].rgbReserved = 0;
+	dbmi.bmiColors[1].rgbBlue = 0;
+	dbmi.bmiColors[1].rgbGreen = 0;
+	dbmi.bmiColors[1].rgbRed = 0;
+	dbmi.bmiColors[1].rgbReserved = 0;
+
+	HDC hDCMem = CreateCompatibleDC(0);
+
+	fntbitmap = CreateDIBSection(hDCMem, (BITMAPINFO*)&dbmi, DIB_RGB_COLORS, &pixels, NULL, 0);
+	if (fntbitmap == NULL) {
+		MessageBox(NULL, _T("Could not load the desired image image"), _T("Error"), MB_OK);
+		return;
+	}
+	
+	memcpy(pixels, fontbits, height * width / 8);
+	
+	DeleteDC(hDCMem);
 }
 
 static void
 do_paint(struct tile_window *tilewin, HDC hdc, RECT *rcUpdate)
 {
-	unsigned tile_x, tile_y, x, y;
-
+	unsigned x, y;
+	HDC hdcMem, hdcMem2;
+	
 	FillRect(hdc, rcUpdate, (HBRUSH) (COLOR_WINDOW + 1));
 
-	// TODO: fix bit order issue with XBMs
-	// font_use(hdc, font8x16_bits, font8x16_width, font8x16_height);
-	font_use(hdc, font8x16_bmp);
-
-	HGDIOBJ oldbmp = SelectObject(hDCMem, fntbitmap);
+	hdcMem = CreateCompatibleDC(0);
+    hdcMem2 = CreateCompatibleDC(0);
 	
-	for (y = 0; y < screen_h; y++) {
-		struct tile_info *ti = &tilewin->tiles[y * screen_w];
-		for (x = 0; x < screen_w; x++, ti++) {
-			tile_x = (ti->ch % 32) * font_tile_width;
-			tile_y = (ti->ch / 32) * font_tile_height;
-			SetTextColor(hdc, pal[ti->fg]);
-			SetBkColor(hdc, pal[ti->bg]);
+	HGDIOBJ oldbmp = SelectObject(hdcMem, fntbitmap);
+	
+	/* draw screen area */
+	// TODO: use rcUpdate to only draw min_x, min_y, max_x and max_y
+	for (y = 0; y < screen_height; y++) {
+		struct tile_info *ti = &tilewin->tiles[y * screen_width];
+		for (x = 0; x < screen_width; x++, ti++) {
+			int nXDest = x * font_tile_width, nYDest = y * font_tile_height, 
+				nWidth = font_tile_width, nHeight = font_tile_height,
+				nXSrc = (ti->ch % 32) * font_tile_width, nYSrc = (ti->ch / 32) * font_tile_height;
+			RGBQUAD p[2] = { pal[ti->fg], pal[ti->bg] };
 			
-			BitBlt(hdc, x * font_tile_width, y * font_tile_height,
-				font_tile_width, font_tile_height,
-				hDCMem, tile_x, tile_y, SRCCOPY);
+			SetDIBColorTable(hdcMem, 0, 2, p);
+			BitBlt(hdc, nXDest, nYDest, nWidth, nHeight, hdcMem, nXSrc, nYSrc, SRCCOPY);
+
+			// TODO: StretchBlt()
 		}
 	}
 	
-	SelectObject(hDCMem, oldbmp);
-	
+	SelectObject(hdcMem, oldbmp);
+	DeleteDC(hdcMem);
+	DeleteDC(hdcMem2);
+
 	font_done();
 }
 
@@ -205,13 +223,14 @@ workspaceWindowProc(
 		// ShowCursor(TRUE);
 		// CREATESTRUCT *pCreate = (CREATESTRUCT*)lParam;
 		// SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)pCreate->lpCreateParams);
-		tilewin = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, tile_window_size(MY_TILE_WIDTH, MY_TILE_HEIGHT));
+		tilewin = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+			tile_window_size(screen_width, screen_height));
 		if (!tilewin) {
 			DestroyWindow(hwnd);
 			MessageBox(NULL, _T("Failed to allocate machine"), _T("Error"), MB_ICONEXCLAMATION | MB_TASKMODAL | MB_OK);
 			return 0;
 		}
-		tile_window_init(tilewin, MY_TILE_WIDTH, MY_TILE_HEIGHT);
+		tile_window_init(tilewin, screen_width, screen_height);
 		SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)tilewin);
 		return 0;
 	case WM_PRINTCLIENT:
@@ -230,6 +249,8 @@ workspaceWindowProc(
 		EndPaint(hwnd, &ps);
 		return 0;
 		}
+	case WM_ERASEBKGND:
+		return 0;
 //	case WM_COMMAND:
 //		mach = (struct machine *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 //		if (!mach)
@@ -261,6 +282,8 @@ new_window(void)
 	LPCTSTR lpszClassName = _T("Tile Window Class");
 	HWND hwnd;
 	HINSTANCE hInstance = GetModuleHandle(NULL);
+	RECT rect;
+	DWORD wflags;
 	
 	if (aWndClass == 0) {
 		WNDCLASS wc = { 0 };
@@ -272,11 +295,14 @@ new_window(void)
 		aWndClass = RegisterClass(&wc);
 	}
 	
-	hwnd = CreateWindow(MAKEINTATOM(aWndClass), _T("Tile"), WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT,
-		font_tile_width * MY_TILE_WIDTH, font_tile_height * MY_TILE_HEIGHT,
-		NULL, NULL,
-		hInstance, 0);
+	rect.left = rect.top = 0;
+	rect.right = out_width;
+	rect.bottom = out_height;
+	wflags = WS_OVERLAPPEDWINDOW;
+	AdjustWindowRect(&rect, wflags, FALSE);
+	hwnd = CreateWindow(MAKEINTATOM(aWndClass), _T("Tile"), wflags,
+		CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top,
+		NULL, NULL, hInstance, 0);
 	
 	if (!hwnd) {
 			MessageBox(NULL, _T("Failed to create window"), _T("Error"), MB_ICONEXCLAMATION | MB_TASKMODAL | MB_OK);
@@ -291,6 +317,7 @@ load(void)
 {
 	//// Load resources /////
 
+	font_use(font8x16_bmp);
 	
 	return 0;
 }
@@ -299,10 +326,18 @@ static int
 init(int nCmdShow)
 {
 	if (load())
-		return 1;
+		return -1;
 	
-	font_load(font8x16_bmp, NULL, NULL);
-
+	if (!font_tile_width || !font_tile_height || !fntbitmap) {
+			MessageBox(NULL, _T("Failed to setup bitmap"), _T("Error"), MB_ICONEXCLAMATION | MB_TASKMODAL | MB_OK);
+			return -1; /* failure */
+	}
+	
+	screen_width = 80;
+	screen_height = 30;
+	out_width = screen_width * font_tile_width;
+	out_height = screen_height * font_tile_height;
+	
 	HWND mywin = new_window();
 	ShowWindow(mywin, nCmdShow);
 	UpdateWindow(mywin);
@@ -314,6 +349,7 @@ init(int nCmdShow)
 static void
 fini(void)
 {
+	font_done();
 }
 
 static void
@@ -336,9 +372,9 @@ loop(void)
 
 int CALLBACK
 WinMain(
-    HINSTANCE hInstance,
-    HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine,
+    HINSTANCE hInstance __attribute__((unused)),
+    HINSTANCE hPrevInstance __attribute__((unused)),
+    LPSTR lpCmdLine __attribute__((unused)),
     int nCmdShow)
 {
 	if (init(nCmdShow))
