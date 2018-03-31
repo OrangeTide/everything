@@ -8,15 +8,21 @@
 
 #include "jdm_embed.h"
 
-JDM_EMBED_FILE(font8x8_bmp, "font8x8.bmp");
-JDM_EMBED_FILE(font8x16_bmp, "font8x16.bmp");
-JDM_EMBED_FILE(font16x16_bmp, "font16x16.bmp");
+JDM_EMBED_FILE(sheet1_bmp, "assets/sheet1.bmp");
 
-static unsigned 
-	font_tile_width, font_tile_height,
+#define TILES_PER_ROW 32
+
+static unsigned
+	sheet_tile_width, sheet_tile_height,
 	screen_width, screen_height,
 	out_width, out_height;
-static HBITMAP fntbitmap;
+static HBITMAP sheetbitmap;
+
+static const unsigned font16x16_offset = 0;
+/* 32 rows down is the start of the 8x16 font */
+static const unsigned font8x16_offset = 32 * TILES_PER_ROW;
+/* 48 rows down is the start of the 8x8 font */
+static const unsigned font8x8_offset = 48 * TILES_PER_ROW;
 
 static const RGBQUAD pal[16] = {
 	{ 0, 0, 0, 0 },
@@ -62,14 +68,45 @@ tile_window_init(struct tile_window *tilewin, unsigned w, unsigned h)
 	tilewin->h = h;
 
 	// DEBUG: fill the tile map with random characters
+#if 0
+	/* 8x8 font */
 	for (y = 0; y < h; y++) {
 		struct tile_info *ti = &tilewin->tiles[y * w];
 		for (x = 0; x < w; x++, ti++) {
 			ti->fg = rand() % 16;
 			ti->bg = rand() % 16;
-			ti->ch = ' ' + (rand() % 95);
+
+			if (ti->fg == ti->bg)
+				ti->bg ^= 15;
+
+			ti->ch = font8x8_offset + ' ' + (rand() % 95);
 		}
 	}
+#else
+	/* 8x16 font */
+	for (y = 0; y < h; y += 2) {
+		struct tile_info *ti = &tilewin->tiles[y * w];
+		for (x = 0; x < w; x++, ti++) {
+			int ch = ' ' + rand() % 95;
+
+			ti->fg = rand() % 16;
+			ti->bg = rand() % 16;
+
+			if (ti->fg == ti->bg)
+				ti->bg ^= 15;
+
+			/* because every 8x16 character spans 2 rows, we need to adjust odd rows */
+			ti->ch = font8x16_offset +
+				(TILES_PER_ROW * 2 * (ch / TILES_PER_ROW)) + (ch % TILES_PER_ROW);
+			/* copy on to next line down */
+			ti[screen_width].fg = ti->fg;
+			ti[screen_width].bg = ti->bg;
+			ti[screen_width].ch = ti->ch + TILES_PER_ROW;
+		}
+	}
+#endif
+
+
 }
 
 void report_error(const char *f, ...)
@@ -78,11 +115,11 @@ void report_error(const char *f, ...)
 	va_list ap;
 	TCHAR wbuf[512];
 	int nResult;
-	
+
 	va_start(ap, f);
 	vsnprintf(buf, sizeof(buf), f, ap);
 	va_end(ap);
-	
+
 	nResult = MultiByteToWideChar(CP_UTF8, 0, buf, strlen(buf),
 		wbuf, sizeof(wbuf) / sizeof(*wbuf));
 	if (nResult > 0)
@@ -92,7 +129,7 @@ void report_error(const char *f, ...)
 }
 
 static const void *
-font_load(const void *bmpdata, int *out_width, int *out_height)
+sheet_load(const void *bmpdata, int *out_width, int *out_height)
 {
 	const void *bits;
 	int width, height;
@@ -102,41 +139,41 @@ font_load(const void *bmpdata, int *out_width, int *out_height)
 	width = *(DWORD*)((char*)bmpdata + 18),
 	height = *(DWORD*)((char*)bmpdata + 22);
 
-	font_tile_width = width / 32;
-	font_tile_height = height / 8;
+	sheet_tile_width = width / TILES_PER_ROW; /* assume 256-width means 8x8 tiles */
+	sheet_tile_height = sheet_tile_width; /* only support square tiles */
 
 	if (out_width)
 		*out_width = width;
 	if (out_height)
 		*out_height = height;
-	
+
 	return bits;
 }
 
 static void
-font_done(void)
+sheet_done(void)
 {
-	DeleteObject(fntbitmap);
-	fntbitmap = NULL;
+	DeleteObject(sheetbitmap);
+	sheetbitmap = NULL;
 }
 
 static void
-font_use(const void *bmpdata)
-{	
+sheet_use(const void *bmpdata)
+{
 	const void *fontbits;
 	int width, height;
-	struct { 
+	struct {
 		BITMAPINFOHEADER bmiHeader;
 		RGBQUAD bmiColors[256];
 	} dbmi; /* BITMAPINFO but with pre-allocated bmiColors[] array */
 	void *pixels;
-	
-	if (fntbitmap)
-		font_done();
-	
-	fontbits = font_load(bmpdata, &width, &height);
 
-	ZeroMemory(&dbmi, sizeof(dbmi));  
+	if (sheetbitmap)
+		sheet_done();
+
+	fontbits = sheet_load(bmpdata, &width, &height);
+
+	ZeroMemory(&dbmi, sizeof(dbmi));
 	dbmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 	dbmi.bmiHeader.biWidth = width;
 	dbmi.bmiHeader.biHeight  = height;
@@ -148,7 +185,7 @@ font_use(const void *bmpdata)
 	dbmi.bmiHeader.biYPelsPerMeter = 3780;
 	dbmi.bmiHeader.biClrUsed = 2;
 	dbmi.bmiHeader.biClrImportant = 0;
-	
+
 	dbmi.bmiColors[0].rgbBlue = 255;
 	dbmi.bmiColors[0].rgbGreen = 255;
 	dbmi.bmiColors[0].rgbRed = 255;
@@ -160,14 +197,14 @@ font_use(const void *bmpdata)
 
 	HDC hDCMem = CreateCompatibleDC(0);
 
-	fntbitmap = CreateDIBSection(hDCMem, (BITMAPINFO*)&dbmi, DIB_RGB_COLORS, &pixels, NULL, 0);
-	if (fntbitmap == NULL) {
+	sheetbitmap = CreateDIBSection(hDCMem, (BITMAPINFO*)&dbmi, DIB_RGB_COLORS, &pixels, NULL, 0);
+	if (sheetbitmap == NULL) {
 		MessageBox(NULL, _T("Could not load the desired image image"), _T("Error"), MB_OK);
 		return;
 	}
-	
+
 	memcpy(pixels, fontbits, height * width / 8);
-	
+
 	DeleteDC(hDCMem);
 }
 
@@ -176,36 +213,38 @@ do_paint(struct tile_window *tilewin, HDC hdc, RECT *rcUpdate)
 {
 	unsigned x, y;
 	HDC hdcMem, hdcMem2;
-	
+
 	FillRect(hdc, rcUpdate, (HBRUSH) (COLOR_WINDOW + 1));
 
 	hdcMem = CreateCompatibleDC(0);
     hdcMem2 = CreateCompatibleDC(0);
-	
-	HGDIOBJ oldbmp = SelectObject(hdcMem, fntbitmap);
-	
+
+	HGDIOBJ oldbmp = SelectObject(hdcMem, sheetbitmap);
+
 	/* draw screen area */
 	// TODO: use rcUpdate to only draw min_x, min_y, max_x and max_y
 	for (y = 0; y < screen_height; y++) {
 		struct tile_info *ti = &tilewin->tiles[y * screen_width];
 		for (x = 0; x < screen_width; x++, ti++) {
-			int nXDest = x * font_tile_width, nYDest = y * font_tile_height, 
-				nWidth = font_tile_width, nHeight = font_tile_height,
-				nXSrc = (ti->ch % 32) * font_tile_width, nYSrc = (ti->ch / 32) * font_tile_height;
+			unsigned id = ti->ch;
+			int nXDest = x * sheet_tile_width, nYDest = y * sheet_tile_height,
+				nWidth = sheet_tile_width, nHeight = sheet_tile_height,
+				nXSrc = (id % TILES_PER_ROW) * sheet_tile_width,
+				nYSrc = (id / TILES_PER_ROW) * sheet_tile_height;
 			RGBQUAD p[2] = { pal[ti->fg], pal[ti->bg] };
-			
+
 			SetDIBColorTable(hdcMem, 0, 2, p);
 			BitBlt(hdc, nXDest, nYDest, nWidth, nHeight, hdcMem, nXSrc, nYSrc, SRCCOPY);
 
 			// TODO: StretchBlt()
 		}
 	}
-	
+
 	SelectObject(hdcMem, oldbmp);
 	DeleteDC(hdcMem);
 	DeleteDC(hdcMem2);
 
-	font_done();
+	sheet_done();
 }
 
 static LRESULT CALLBACK
@@ -217,7 +256,7 @@ workspaceWindowProc(
 {
 	struct tile_window *tilewin;
 	HDC hdc;
-	
+
 	switch (uMsg) {
 	case WM_CREATE:
 		// ShowCursor(TRUE);
@@ -284,7 +323,7 @@ new_window(void)
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 	RECT rect;
 	DWORD wflags;
-	
+
 	if (aWndClass == 0) {
 		WNDCLASS wc = { 0 };
 		wc.lpfnWndProc = workspaceWindowProc;
@@ -294,7 +333,7 @@ new_window(void)
 		wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(0));
 		aWndClass = RegisterClass(&wc);
 	}
-	
+
 	rect.left = rect.top = 0;
 	rect.right = out_width;
 	rect.bottom = out_height;
@@ -303,12 +342,12 @@ new_window(void)
 	hwnd = CreateWindow(MAKEINTATOM(aWndClass), _T("Tile"), wflags,
 		CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top,
 		NULL, NULL, hInstance, 0);
-	
+
 	if (!hwnd) {
 			MessageBox(NULL, _T("Failed to create window"), _T("Error"), MB_ICONEXCLAMATION | MB_TASKMODAL | MB_OK);
 			return 0; /* failed */
 	}
-	
+
 	return hwnd;
 }
 
@@ -317,8 +356,8 @@ load(void)
 {
 	//// Load resources /////
 
-	font_use(font8x16_bmp);
-	
+	sheet_use(sheet1_bmp);
+
 	return 0;
 }
 
@@ -327,21 +366,21 @@ init(int nCmdShow)
 {
 	if (load())
 		return -1;
-	
-	if (!font_tile_width || !font_tile_height || !fntbitmap) {
+
+	if (!sheet_tile_width || !sheet_tile_height || !sheetbitmap) {
 			MessageBox(NULL, _T("Failed to setup bitmap"), _T("Error"), MB_ICONEXCLAMATION | MB_TASKMODAL | MB_OK);
 			return -1; /* failure */
 	}
-	
+
 	screen_width = 80;
-	screen_height = 30;
-	out_width = screen_width * font_tile_width;
-	out_height = screen_height * font_tile_height;
-	
+	screen_height = 60;
+	out_width = screen_width * sheet_tile_width;
+	out_height = screen_height * sheet_tile_height;
+
 	HWND mywin = new_window();
 	ShowWindow(mywin, nCmdShow);
 	UpdateWindow(mywin);
-	
+
 	return 0;
 }
 
@@ -349,7 +388,7 @@ init(int nCmdShow)
 static void
 fini(void)
 {
-	font_done();
+	sheet_done();
 }
 
 static void
@@ -361,7 +400,7 @@ loop(void)
 //		{ 0, VK_ESCAPE, ACTION_EXIT },
 //	};
 //	HACCEL hAccTable = CreateAcceleratorTable(accl, sizeof(accl) / sizeof(*accl));
-		
+
 	MSG msg;
 	while (GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
@@ -379,10 +418,10 @@ WinMain(
 {
 	if (init(nCmdShow))
 		return 1;
-	
+
 	loop();
-	
+
 	fini();
-	
+
 	return 0;
 }
