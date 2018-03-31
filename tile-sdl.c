@@ -13,10 +13,31 @@ static SDL_Window *main_win;
 static SDL_Renderer *main_ren;
 static SDL_Texture *sheet1_tex;
 
+static const SDL_Color vga_pal[16] = {
+	{ 0, 0, 0, 0 },
+	{ 0, 0, 170, 0 },
+	{ 0, 170, 0, 0 },
+	{ 0, 170, 170, 0 },
+	{ 170, 0, 0, 0 },
+	{ 170, 0, 170, 0 },
+	{ 170, 85, 0, 0 },
+	{ 170, 170, 170, 0 },
+	{ 85, 85, 85, 0 },
+	{ 85, 85, 255, 0 },
+	{ 85, 255, 85, 0 },
+	{ 85, 255, 255, 0 },
+	{ 255, 85, 85, 0 },
+	{ 255, 85, 255, 0 },
+	{ 255, 255, 85, 0 },
+	{ 255, 255, 255, 0 },
+};
+
 static void
 paint(void)
 {
 	SDL_Rect src, dst;
+
+	// TODO: draw individual tiles
 
 	src.x = 0;
 	src.y = 0;
@@ -28,14 +49,19 @@ paint(void)
 	dst.w = src.w;
 	dst.h = src.h;
 
-	SDL_SetRenderDrawColor(main_ren, 170, 85, 0, SDL_ALPHA_OPAQUE);
+	/* clear screen to brown */
+	SDL_SetRenderDrawColor(main_ren, 170, 85, 0, SDL_ALPHA_OPAQUE); // border color
 	SDL_RenderClear(main_ren);
 
-	SDL_SetRenderDrawColor(main_ren, 255, 255, 85, SDL_ALPHA_OPAQUE);
+	/* background color - fill a rectangle with bright yellow */
+	SDL_SetRenderDrawColor(main_ren, vga_pal[1].r, vga_pal[1].g, vga_pal[1].b, SDL_ALPHA_OPAQUE); // background color
 	SDL_RenderFillRect(main_ren, &dst);
 
-	SDL_SetTextureColorMod(sheet1_tex, 255, 85, 255); // TODO: set foreground color
-	SDL_RenderCopy(main_ren, sheet1_tex, &src, &dst); // TODO: draw tiles
+	/* foreground color - draw the text with a color-mod */
+	SDL_SetTextureColorMod(sheet1_tex, vga_pal[14].r, vga_pal[14].g, vga_pal[14].b); // foreground color
+	SDL_SetRenderDrawBlendMode(main_ren, SDL_BLENDMODE_NONE);
+	SDL_RenderCopy(main_ren, sheet1_tex, &src, &dst);
+
 	SDL_RenderPresent(main_ren);
 }
 
@@ -48,36 +74,18 @@ load(void)
 	sheet1_rwops = SDL_RWFromConstMem(sheet1_bmp, sheet1_bmp_len);
 	sheet1_surface = SDL_LoadBMP_RW(sheet1_rwops, SDL_TRUE);	
 
-#if 1
+	SDL_Log("sheet1 bpp:%d pal:%p", sheet1_surface->format->BitsPerPixel, sheet1_surface->format->palette);
+
+	/* convert image into alpha mask */
+	SDL_Color pal[2] = {
+		// TODO: these seem backwards ... GIMP probably encoded it goofy
+		{ 255, 255, 255, SDL_ALPHA_OPAQUE, },
+		{ 0, 0, 0, 0 }, /* transparent */
+	};
+	SDL_SetPaletteColors(sheet1_surface->format->palette, pal, 0, 2);
+	SDL_SetSurfaceBlendMode(sheet1_surface, SDL_BLENDMODE_BLEND);
+
 	sheet1_tex = SDL_CreateTextureFromSurface(main_ren, sheet1_surface);
-#else // TODO: fix this to work on surfaces of different depths
-	void *mem_pixels;
-	int mem_pitch;
-
-	sheet1_tex = SDL_CreateTexture(main_ren,
-		SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING,
-		sheet1_surface->w, sheet1_surface->h );
-	SDL_LockTexture(sheet1_tex, &sheet1_surface->clip_rect, &mem_pixels, &mem_pitch);
-
-	// TODO: loop through this properly
-	memcpy(mem_pixels, sheet1_surface->pixels, sheet1_surface->pitch * sheet1_surface->h);
-
-	// Attempt to convert pixel values
-//	Uint32 foreground = SDL_MapRGB(sheet1_surface->format, 255, 255, 255);
-	Uint32 background = SDL_MapRGB(sheet1_surface->format, 0, 0, 0);
-	Uint32 transparent = SDL_MapRGBA(sheet1_surface->format, 0, 255, 255, 0);
-	int i;
-	int total = (mem_pitch / 4) * sheet1_surface->h;
-	Uint32 *p = mem_pixels;
-
-	for (i = 0; i < total; i++, p++) {
-		if (*p == background) {
-			*p = transparent;
-		}
-	}
-
-	SDL_UnlockTexture(sheet1_tex);
-#endif
 
 	SDL_FreeSurface(sheet1_surface);
 	sheet1_surface = NULL;
