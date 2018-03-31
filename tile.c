@@ -15,7 +15,7 @@ JDM_EMBED_FILE(sheet1_bmp, "assets/sheet1.bmp");
 static unsigned
 	sheet_tile_width, sheet_tile_height,
 	screen_width, screen_height,
-	out_width, out_height;
+	out_width, out_height, out_scale = 2; // TODO: handle the scaling better
 static HBITMAP sheetbitmap;
 
 static const unsigned font16x16_offset = 0;
@@ -234,9 +234,16 @@ do_paint(struct tile_window *tilewin, HDC hdc, RECT *rcUpdate)
 			RGBQUAD p[2] = { pal[ti->fg], pal[ti->bg] };
 
 			SetDIBColorTable(hdcMem, 0, 2, p);
-			BitBlt(hdc, nXDest, nYDest, nWidth, nHeight, hdcMem, nXSrc, nYSrc, SRCCOPY);
-
-			// TODO: StretchBlt()
+			if (out_scale == 1) {
+				BitBlt(hdc, nXDest, nYDest, nWidth, nHeight,
+					hdcMem, nXSrc, nYSrc, SRCCOPY);
+			} else {
+				StretchBlt(hdc,
+					out_scale * nXDest, out_scale * nYDest,
+					out_scale * nWidth, out_scale * nHeight,
+					hdcMem, nXSrc, nYSrc, nWidth, nHeight,
+					SRCCOPY);
+			}
 		}
 	}
 
@@ -374,8 +381,8 @@ init(int nCmdShow)
 
 	screen_width = 80;
 	screen_height = 60;
-	out_width = screen_width * sheet_tile_width;
-	out_height = screen_height * sheet_tile_height;
+	out_width = out_scale * screen_width * sheet_tile_width;
+	out_height = out_scale * screen_height * sheet_tile_height;
 
 	HWND mywin = new_window();
 	ShowWindow(mywin, nCmdShow);
