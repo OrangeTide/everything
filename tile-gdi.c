@@ -1,4 +1,4 @@
-/* tile.c : draws a tiles display - public domain. */
+/* tile-gdi.c : draws a tiles display - public domain. */
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
