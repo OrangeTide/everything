@@ -51,6 +51,12 @@ ifeq ($(OS),Windows_NT)
 	# curses
 	PKGCFLAGS.curses =
 	PKGLIBS.curses = -lpdcurses
+	# sdl2
+	PKGCFLAGS.sdl2 =
+	## dynamic:
+	# PKGLIBS.sdl2 = -lmingw32 -lSDL2main -lSDL2
+	# static:
+	PKGLIBS.sdl2 = -static -lmingw32 -lSDL2main -lSDL2 -mwindows -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc
 else ifeq ($(OS),Linux)
 	# mintaro
 	PKGLIBS.mintaro = -lX11 -lXext -lasound -lpthread -lm
