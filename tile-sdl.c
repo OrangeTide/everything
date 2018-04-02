@@ -4,14 +4,16 @@
 
 #include "jdm_embed.h"
 
+#include "tile.h"
+#include "game.h"
+#include "keystate.h"
+
 JDM_EMBED_FILE(sheet1_bmp, "assets/sheet1.bmp");
 
-#define TILES_PER_ROW 32
 #define TILE_WIDTH 8
 #define TILE_HEIGHT 8
 
 static int out_width, out_height, out_scale;
-static int screen_width, screen_height;
 static SDL_Window *main_win;
 static SDL_Renderer *main_ren;
 static SDL_Texture *sheet1_tex;
@@ -40,16 +42,21 @@ static void
 paint(void)
 {
 	SDL_Rect src, dst;
+	int screen_width, screen_height;
+	int x, y;
+	const tile_cell *screen;
+
+	screen = tile_screen_info(&screen_width, &screen_height);
 
 	// TODO: draw individual tiles
 
 	src.x = 0;
 	src.y = 0;
-	src.w = 256;
-	src.h = 256;
+	src.w = TILE_WIDTH;
+	src.h = TILE_HEIGHT;
 
-	dst.x = 64;
-	dst.y = 64;
+	dst.x = 0;
+	dst.y = 0;
 	dst.w = src.w;
 	dst.h = src.h;
 
@@ -59,14 +66,32 @@ paint(void)
 	SDL_SetRenderDrawColor(main_ren, 170, 85, 0, SDL_ALPHA_OPAQUE); // border color
 	SDL_RenderClear(main_ren);
 
-	/* background color - fill a rectangle with bright yellow */
-	SDL_SetRenderDrawColor(main_ren, vga_pal[1].r, vga_pal[1].g, vga_pal[1].b, SDL_ALPHA_OPAQUE); // background color
-	SDL_RenderFillRect(main_ren, &dst);
+	for (y = 0; y < screen_height; y++) {
+		const tile_cell *ch = screen + (y * screen_width);
 
-	/* foreground color - draw the text with a color-mod */
-	SDL_SetTextureColorMod(sheet1_tex, vga_pal[14].r, vga_pal[14].g, vga_pal[14].b); // foreground color
-	SDL_SetRenderDrawBlendMode(main_ren, SDL_BLENDMODE_NONE);
-	SDL_RenderCopy(main_ren, sheet1_tex, &src, &dst);
+		dst.y = y * TILE_HEIGHT;
+		dst.x = 0;
+
+		for (x = 0; x < screen_width; x++, ch++) {
+			src.x = (ch->id % TILES_PER_ROW) * TILE_WIDTH;
+			src.y = (ch->id / TILES_PER_ROW) * TILE_HEIGHT;
+
+			/* background color */
+			SDL_SetRenderDrawColor(main_ren,
+				vga_pal[ch->bg].r, vga_pal[ch->bg].g, vga_pal[ch->bg].b,
+				SDL_ALPHA_OPAQUE);
+			SDL_RenderFillRect(main_ren, &dst);
+
+			/* foreground color - draw the text with a color-mod */
+			SDL_SetTextureColorMod(sheet1_tex,
+				vga_pal[ch->fg].r, vga_pal[ch->fg].g, vga_pal[ch->fg].b);
+			SDL_SetRenderDrawBlendMode(main_ren, SDL_BLENDMODE_NONE);
+
+			SDL_RenderCopy(main_ren, sheet1_tex, &src, &dst);
+
+			dst.x += TILE_WIDTH;
+		}
+	}
 
 	SDL_RenderPresent(main_ren);
 }
@@ -78,7 +103,7 @@ load(void)
 	SDL_Surface *sheet1_surface;
 
 	sheet1_rwops = SDL_RWFromConstMem(sheet1_bmp, sheet1_bmp_len);
-	sheet1_surface = SDL_LoadBMP_RW(sheet1_rwops, SDL_TRUE);	
+	sheet1_surface = SDL_LoadBMP_RW(sheet1_rwops, SDL_TRUE);
 
 	SDL_Log("sheet1 bpp:%d pal:%p", sheet1_surface->format->BitsPerPixel, sheet1_surface->format->palette);
 
@@ -102,14 +127,19 @@ load(void)
 static int
 init(void)
 {
+	int screen_width, screen_height;
+
 	if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS)) {
 		SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
-		return 1;
+		return -1;
 	}
 
-	screen_width = 80;
-	screen_height = 60;
-	out_scale = 2;
+	if (tile_screen_init(40, 30))
+		return -1;
+
+	tile_screen_info(&screen_width, &screen_height);
+
+	out_scale = 3;
 	out_width = out_scale * screen_width * TILE_WIDTH;
 	out_height = out_scale * screen_height * TILE_HEIGHT;
 	fullscreen = false;
@@ -122,17 +152,36 @@ init(void)
 		SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
 	if (load())
-		return -1;
+		goto fail;
+
+	game_init();
 
 	return 0;
+fail:
+	tile_screen_free();
+	SDL_DestroyTexture(sheet1_tex);
+	sheet1_tex = NULL;
+	SDL_DestroyRenderer(main_ren);
+	main_ren = NULL;
+	SDL_DestroyWindow(main_win);
+	main_win = NULL;
+	return -1;
 }
 
 static void
 loop(void)
 {
 	SDL_Event e;
+	Uint64 prev, now, freq = SDL_GetPerformanceFrequency();
+	keystate *game_left = keystate_connect("left");
+	keystate *game_right = keystate_connect("right");
+	keystate *game_up = keystate_connect("up");
+	keystate *game_down = keystate_connect("down");
 
+	prev = SDL_GetPerformanceCounter();
 	while (1) {
+		now = SDL_GetPerformanceCounter();
+		game_update((double)(now - prev) / freq);
 		paint();
 
 		if (!SDL_WaitEvent(&e)) {
@@ -143,17 +192,34 @@ loop(void)
 		case SDL_QUIT:
 			return; /* quit! */
 		case SDL_KEYDOWN:
+		case SDL_KEYUP:
 			switch (e.key.keysym.sym) {
 			case SDLK_ESCAPE:
 				// TODO: prompt before exiting
-				return; /* quit! */
+				if (e.type == SDL_KEYDOWN)
+					return; /* quit! */
+				break;
 			case SDLK_F11: /* fullscreen */
-				fullscreen = !fullscreen;
-				if (fullscreen)
-					SDL_SetWindowFullscreen(main_win,
-							SDL_WINDOW_FULLSCREEN_DESKTOP);
-				else
-					SDL_SetWindowFullscreen(main_win, 0);
+				if (e.type == SDL_KEYDOWN) {
+					fullscreen = !fullscreen;
+					if (fullscreen)
+						SDL_SetWindowFullscreen(main_win,
+								SDL_WINDOW_FULLSCREEN_DESKTOP);
+					else
+						SDL_SetWindowFullscreen(main_win, 0);
+				}
+				break;
+			case SDLK_LEFT: // TODO: remappable keys
+				keystate_send(game_left, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_RIGHT: // TODO: remappable keys
+				keystate_send(game_right, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_UP: // TODO: remappable keys
+				keystate_send(game_up, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_DOWN: // TODO: remappable keys
+				keystate_send(game_down, e.type == SDL_KEYDOWN);
 				break;
 			}
 			break;
@@ -179,7 +245,7 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 {
 	if (init())
 		return 1;
-		
+
 	loop();
 
 	fini();
