@@ -105,8 +105,6 @@ load(void)
 	sheet1_rwops = SDL_RWFromConstMem(sheet1_bmp, sheet1_bmp_len);
 	sheet1_surface = SDL_LoadBMP_RW(sheet1_rwops, SDL_TRUE);
 
-	SDL_Log("sheet1 bpp:%d pal:%p", sheet1_surface->format->BitsPerPixel, sheet1_surface->format->palette);
-
 	/* convert image into alpha mask */
 	SDL_Color pal[2] = {
 		// TODO: these seem backwards ... GIMP probably encoded it goofy
