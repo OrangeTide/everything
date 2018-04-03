@@ -137,7 +137,7 @@ init(void)
 
 	tile_screen_info(&screen_width, &screen_height);
 
-	out_scale = 3;
+	out_scale = 1;
 	out_width = out_scale * screen_width * TILE_WIDTH;
 	out_height = out_scale * screen_height * TILE_HEIGHT;
 	fullscreen = false;

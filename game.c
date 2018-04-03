@@ -40,9 +40,12 @@ void game_update(double elapsed __attribute__((unused)))
 	tile_cell font16x16 = { font16x16_offset, 7, 0 };
 	tile_region clip1 = { 4, 0, 20, 6 };
 	tile_region clip2 = { 8, 4, 20, 6 };
-	tile_region clip3 = { 3, 12, 20, 4 };
+	tile_region clip3 = { 0, 0, 20, 4 };
 	int x, y;
-
+	int screen_width, screen_height;
+	const tile_cell *screen = tile_screen_info(&screen_width, &screen_height);
+	static int player_x = 3, player_y = 12;
+	
 	tile_clear(fillch, NULL);
 
 	x = 1;
@@ -58,6 +61,9 @@ void game_update(double elapsed __attribute__((unused)))
 	tile_clear(font8x16, &clip2);
 	tile_print8x16(font8x16, &clip2, &x, &y, "Is that you world?");
 
+	clip3.x = player_x;
+	clip3.y = player_y;
+	
 	x = 0;
 	y = 0;
 	tile_clear(font16x16, &clip3);
@@ -67,4 +73,32 @@ void game_update(double elapsed __attribute__((unused)))
 	fillch = font16x16;
 	fillch.id = font8x8_offset + '\x1'; // the fill character for scrolling must be 8x8
 	tile_hscroll(fillch, &clip3, 2);
+	
+	/** update based on keyboard input **/
+	
+	if (keystate_is_down(game_left)) {
+		player_x--;
+	} else if (keystate_is_down(game_right)) {
+		player_x++;
+	}
+
+	if (keystate_is_down(game_up)) {
+		player_y--;
+	} else if (keystate_is_down(game_down)) {
+		player_y++;
+	}
+	
+	/* restrict area that we may travel */
+	if (player_x < 2) {
+		player_x = 2;
+	} else if (player_x > screen_width - 3) {
+		player_x = screen_width - 3;
+	}
+	
+	if (player_y < 2) {
+		player_y = 2;
+	} else if (player_y > screen_height - 3) {
+		player_y = screen_height - 3;
+	}
+	
 }

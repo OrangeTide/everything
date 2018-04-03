@@ -38,6 +38,12 @@ keystate_send(keystate *ks, int down)
 		ks->down = down;
 }
 
+static inline int
+keystate_is_down(keystate *ks)
+{
+	return ks ? ks->down : 0;
+}
+
 #ifdef KEYSTATE_IMPLEMENTATION
 
 #include <stdlib.h>
