@@ -74,8 +74,8 @@ clear_screen(unsigned char attr)
  * 				returned as cursor position report (CPR): ESC [ <r>;<c> R
  *
  * Key:
- * <r>	row
- * <c>	column
+ * <r>	row (1-based)
+ * <c>	column (1-based)
  * <n>	number 
  */
 void ansi_load(const char *filename)
@@ -201,10 +201,12 @@ void ansi_load(const char *filename)
 							pos_y = 0;
 							pos_x = 0;
 						} else if (num_parameters == 1) {
-							pos_y = parameters[0];
+							pos_y = parameters[0] - 1;
 						} else  if (num_parameters >= 2) {
-							pos_y = parameters[0];
-							pos_x = parameters[1];
+							if (parameters[0])
+								pos_y = parameters[0] - 1;
+							if (parameters[0])
+								pos_x = parameters[1] - 1;
 						}
 					} else if (ch == 'm') { /* ANSI color */
 						unsigned i;
