@@ -16,6 +16,7 @@ void tile_copyrect(int dstx, int dsty, const tile_region *src);
 void tile_hscroll(tile_cell fillch, const tile_region *region, int scroll);
 void tile_vscroll(tile_cell fillch, const tile_region *region, int scroll);
 void tile_set(tile_cell ch, int x, int y);
+void tile_set8x16(tile_cell base, unsigned char ch, int x, int y);
 void tile_print8x8(tile_cell color, const tile_region *clip, int *x, int *y, const char *s);
 void tile_print8x16(tile_cell color, const tile_region *clip, int *x, int *y, const char *s);
 void tile_print16x16(tile_cell color, const tile_region *clip, int *x, int *y, const char *s);

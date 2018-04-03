@@ -7,6 +7,21 @@
 static tile_cell *screen;
 static int screen_width, screen_height;
 
+/* if region is NULL, return entire screen. else return the original region. */
+static inline const tile_region *screen_region(const tile_region *region)
+{
+	static tile_region tmp;
+	
+	if (region)
+		return region;
+	
+	tmp.x = 0;
+	tmp.y = 0;
+	tmp.w = screen_width;
+	tmp.h = screen_height;
+	return &tmp;	
+}
+	
 /* returns 0 on success, 1 if the region is empty or invalid */
 static int
 clip_region(const tile_region *region, int *x0, int *y0, int *x1, int *y1)
@@ -69,16 +84,8 @@ void
 tile_clear(tile_cell ch, const tile_region *region)
 {
 	int x0, y0, x1, y1, x, y;
-	tile_region tmp;
 
-	if (!region) {
-		/* if region is NULL, use entire screen */
-		tmp.x = 0;
-		tmp.y = 0;
-		tmp.w = screen_width;
-		tmp.h = screen_height;
-		region = &tmp;
-	}
+	region = screen_region(region);
 
 	if (clip_region(region, &x0, &y0, &x1, &y1))
 		return;
@@ -99,6 +106,7 @@ tile_copyrect(int dstx, int dsty, const tile_region *src)
 	tile_cell *dstp, *srcp;
 	int len;
 
+	src = screen_region(src);
 	if (clip_region(src, &sx0, &sy0, &sx1, &sy1))
 		return;
 
@@ -130,6 +138,8 @@ tile_vscroll(tile_cell fillch, const tile_region *region, int scroll)
 {
 	int dstx, dsty;
 	tile_region src, clr;
+
+	region = screen_region(region);
 
 	if (!scroll) {
 		return;
@@ -169,6 +179,8 @@ tile_hscroll(tile_cell fillch, const tile_region *region, int scroll)
 	int dstx, dsty;
 	tile_region src, clr;
 
+	region = screen_region(region);
+
 	if (!scroll) {
 		return;
 	} else if (scroll < 0) {
@@ -204,8 +216,17 @@ tile_hscroll(tile_cell fillch, const tile_region *region, int scroll)
 void
 tile_set(tile_cell ch, int x, int y)
 {
-	if (x > 0 && x < screen_width && y > 0 && y < screen_height)
+	if (x >= 0 && x < screen_width && y >= 0 && y < screen_height)
 		screen[x + y * screen_width] = ch;
+}
+
+void
+tile_set8x16(tile_cell base, unsigned char ch, int x, int y)
+{
+		base.id += (TILES_PER_ROW * 2 * (ch / TILES_PER_ROW)) + (ch % TILES_PER_ROW);
+		tile_set(base, x, y);
+		base.id += TILES_PER_ROW;
+		tile_set(base, x, y + 1);
 }
 
 /*
@@ -218,6 +239,8 @@ tile_print8x8(tile_cell base, const tile_region *clip, int *x, int *y, const cha
 	unsigned char t;
 	int rx, ry;
 	tile_cell ch = base;
+	
+	clip = screen_region(clip);
 
 	rx = clip->x;
 	ry = clip->y;
@@ -225,7 +248,6 @@ tile_print8x8(tile_cell base, const tile_region *clip, int *x, int *y, const cha
 		rx += *x;
 	if (y)
 		ry += *y;
-
 
 	while ((t = *s++)) {
 		ch.id = base.id + t;
@@ -252,7 +274,8 @@ void
 tile_print8x16(tile_cell base, const tile_region *clip, int *x, int *y, const char *s)
 {
 	int rx, ry;
-	tile_cell ch = base;
+
+	clip = screen_region(clip);
 
 	rx = clip->x;
 	ry = clip->y;
@@ -261,13 +284,8 @@ tile_print8x16(tile_cell base, const tile_region *clip, int *x, int *y, const ch
 	if (y)
 		ry += *y * 2;
 
-
 	while (*s) {
 		unsigned char t = *s++;
-
-		ch.id = base.id
-			+ (TILES_PER_ROW * 2 * (t / TILES_PER_ROW))
-			+ (t % TILES_PER_ROW);
 
 		if (rx > clip->x + clip->w) {
 			rx = clip->x; /* wrap to next line */
@@ -277,10 +295,7 @@ tile_print8x16(tile_cell base, const tile_region *clip, int *x, int *y, const ch
 		if (ry > clip->y + clip->h)
 			return; /* outside of clip - not visible */
 
-		tile_set(ch, rx, ry);
-		ch.id += TILES_PER_ROW;
-		tile_set(ch, rx, ry + 1);
-
+		tile_set8x16(base, t, rx, ry);
 		rx++;
 	}
 
@@ -297,13 +312,14 @@ tile_print16x16(tile_cell base, const tile_region *clip, int *x, int *y, const c
 	tile_cell ch = base;
 	unsigned char t;
 
+	clip = screen_region(clip);
+
 	rx = clip->x;
 	ry = clip->y;
 	if (x)
 		rx += *x * 2;
 	if (y)
 		ry += *y * 2;
-
 
 	while ((t = *s++)) {
 		ch.id = base.id +

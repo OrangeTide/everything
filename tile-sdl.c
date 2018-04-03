@@ -132,7 +132,7 @@ init(void)
 		return -1;
 	}
 
-	if (tile_screen_init(40, 30))
+	if (tile_screen_init(80, 50))
 		return -1;
 
 	tile_screen_info(&screen_width, &screen_height);
