@@ -17,11 +17,15 @@ ifeq ($(HOSTOS),Linux)
 	# based on my own cross-compile setup
 	WINDRES = x86_64-w64-mingw32-windres
 	CC = x86_64-w64-mingw32-gcc
-	RM = rm -f
 else
 	WINDRES = windres
 	CC = gcc
+endif
+# detect cmd.exe vs bash
+ifeq ($(SHELL),)
 	RM = del
+else
+	RM = rm -f
 endif
 else ifeq ($(OS),Linux)
 	# first look up packages through PKGCFLAGS/PKGLIBS.
