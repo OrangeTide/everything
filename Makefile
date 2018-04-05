@@ -17,9 +17,11 @@ ifeq ($(HOSTOS),Linux)
 	# based on my own cross-compile setup
 	WINDRES = x86_64-w64-mingw32-windres
 	CC = x86_64-w64-mingw32-gcc
+	STRIP = x86_64-w64-mingw32-strip
 else
 	WINDRES = windres
 	CC = gcc
+	STRIP = strip
 endif
 # detect cmd.exe vs bash
 ifeq ($(SHELL),)
@@ -33,6 +35,7 @@ else ifeq ($(OS),Linux)
 	pkg-config-cflags = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGCFLAGS.$(pkg)),$$(shell pkg-config --cflags $(pkg))))
 	pkg-config-libs = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGLIBS.$(pkg)),$$(shell pkg-config --libs $(pkg))))
 	CC = gcc
+	STRIP = strip
 	CFLAGS = -Wall -W -Og -ggdb
 #TODO: include packages from *.mkpkg files
 else
@@ -60,7 +63,7 @@ ifeq ($(OS),Windows_NT)
 	## dynamic:
 	# PKGLIBS.sdl2 = -lmingw32 -lSDL2main -lSDL2
 	# static:
-	PKGLIBS.sdl2 = -static -lmingw32 -lSDL2main -lSDL2 -mwindows -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc
+	PKGLIBS.sdl2 = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc	
 else ifeq ($(OS),Linux)
 	# mintaro
 	PKGLIBS.mintaro = -lX11 -lXext -lasound -lpthread -lm
@@ -103,6 +106,7 @@ define gen-target
 $(info Generating rules for $1 ... $($1.EXEC) : $($1.SRCS))
 $($1.EXEC) : $($1.SRCS)
 	$(CC) -o $$@ $$^ $($1.CFLAGS) $($1.LDFLAGS)
+	$(STRIP) -S $$@
 all :: $($1.EXEC)
 clean ::
 	$(RM) $$($1.EXEC) $$($1.OBJS)
