@@ -43,8 +43,8 @@ paint(void)
 	// TODO: scale to aspect ratio
 	dstrect.x = 0;
 	dstrect.y = 0;
-	dstrect.w = out_height;
-	dstrect.h = out_width;
+	dstrect.h = out_height;
+	dstrect.w = out_width;
 	
 	SDL_SetRenderDrawColor(main_ren, 170, 0, 170, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(main_ren);
@@ -67,13 +67,15 @@ update(double dt)
 	if (SDL_MUSTLOCK(canvas_surf))
 		SDL_LockSurface(canvas_surf);
 	
+	canvas_width = canvas_surf->w;
+	canvas_height = canvas_surf->h;
 	pixels = canvas_surf->pixels;
 	pitch = canvas_surf->pitch;
-	if (!pixels || !pitch)
+	if (!pixels || !pitch || !canvas_height || !canvas_width)
 		return;
 	
-	for (y = 0, p = pixels; y < canvas_width; y++, p = (void*)((char*)p + pitch))
-		for (x = 0; x < canvas_height; x++)
+	for (y = 0, p = pixels; y < canvas_height; y++, p = (void*)((char*)p + pitch))
+		for (x = 0; x < canvas_width; x++)
 			p[x] = x ^ y;
 	
 	if (SDL_MUSTLOCK(canvas_surf))
@@ -232,7 +234,7 @@ init(void)
 
 	init_palette();
 	
-//	SDL_SetPaletteColors(canvas_surf->format->palette, current_palette, 0, 256);
+	SDL_SetPaletteColors(canvas_surf->format->palette, current_palette, 0, 256);
 	
 	if (load())
 		goto fail;
