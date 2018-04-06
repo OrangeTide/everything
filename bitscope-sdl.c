@@ -5,17 +5,19 @@
 
 #include <SDL2/SDL.h>
 
-#if defined(WIN32)
-#include <windows.h>
+#include "bitscope.h"
+
+#ifdef NDEBUG
+#  define DBG_LOG(...) /* disabled */
+#else
+#  define DBG_LOG(f, ...) fprintf(stderr, f "\n", ## __VA_ARGS__)
+// #define DBG_LOG(...) SDL_Log(__VA_ARGS__)
 #endif
 
 #define BITSCOPE_WINDOW_TITLE "BiTSC0PE"
 #define BITSCOPE_CANVAS_WIDTH 256
 #define BITSCOPE_CANVAS_HEIGHT 192
 #define BITSCOPE_SCALEFACTOR 3
-
-#define DBG_LOG(f, ...) fprintf(stderr, f "\n", ## __VA_ARGS__)
-// #define DBG_LOG(...) SDL_Log(__VA_ARGS__)
 
 static int out_width, out_height, canvas_width, canvas_height;
 static SDL_Window *main_win;
@@ -82,8 +84,8 @@ update(double dt)
 		SDL_UnlockSurface(canvas_surf);
 }
 
-static void
-loop(void)
+void
+bitscope_loop(void)
 {
 	SDL_Event e;
 	Uint64 prev, now, freq = SDL_GetPerformanceFrequency();
@@ -137,13 +139,6 @@ loop(void)
 	}
 }
 
-static int
-load(void)
-{
-	// TODO: implement this
-	return 0;
-}
-
 static void
 init_palette(void)
 {
@@ -185,8 +180,8 @@ init_palette(void)
 };
 
 
-static void
-fini(void)
+void
+bitscope_fini(void)
 {
 	if (canvas_surf)
 		SDL_FreeSurface(canvas_surf);
@@ -201,8 +196,8 @@ fini(void)
 	SDL_Quit();
 }
 
-static int
-init(void)
+int
+bitscope_init(void)
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
 		DBG_LOG("Failed to initialize SDL: %s", SDL_GetError());
@@ -236,34 +231,13 @@ init(void)
 	
 	SDL_SetPaletteColors(canvas_surf->format->palette, current_palette, 0, 256);
 	
-	if (load())
+	if (bitscope_load())
 		goto fail;
 
 	DBG_LOG("Successfully initialized!");
 
 	return 0;
 fail:
-	fini();
+	bitscope_fini();
 	return -1;
-}
-
-int
-main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
-{
-#if defined(WIN32)
-	AllocConsole();
-	freopen("CONIN$", "r",stdin);
-	freopen("CONOUT$", "w",stdout);
-	freopen("CONOUT$", "w",stderr);
-#endif
-	DBG_LOG("Starting up ...");
-	
-	if (init())
-		return 1;
-
-	loop();
-
-	fini();
-
-	return 0;
 }
