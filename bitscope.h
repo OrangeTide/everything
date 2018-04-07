@@ -9,5 +9,6 @@ void bitscope_loop(void);
 
 /* provided by core. called by driver */
 int bitscope_load(void);
+void bitscope_paint(unsigned char *pixels, unsigned width, unsigned height, unsigned pitch);
 
 #endif

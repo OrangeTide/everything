@@ -47,7 +47,7 @@ paint(void)
 	dstrect.y = 0;
 	dstrect.h = out_height;
 	dstrect.w = out_width;
-	
+
 	SDL_SetRenderDrawColor(main_ren, 170, 0, 170, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(main_ren);
 	SDL_RenderCopy(main_ren, canvas_tex, NULL, &dstrect);
@@ -60,26 +60,23 @@ static void
 update(double dt)
 {
 	void *pixels;
-	unsigned char *p;
 	int pitch;
-	int x, y;
 	
 	DBG_LOG("Update (%g sec)", dt);
 
 	if (SDL_MUSTLOCK(canvas_surf))
 		SDL_LockSurface(canvas_surf);
-	
+
 	canvas_width = canvas_surf->w;
 	canvas_height = canvas_surf->h;
 	pixels = canvas_surf->pixels;
 	pitch = canvas_surf->pitch;
+
 	if (!pixels || !pitch || !canvas_height || !canvas_width)
 		return;
-	
-	for (y = 0, p = pixels; y < canvas_height; y++, p = (void*)((char*)p + pitch))
-		for (x = 0; x < canvas_width; x++)
-			p[x] = x ^ y;
-	
+
+	bitscope_paint(pixels, canvas_width, canvas_height, pitch);
+
 	if (SDL_MUSTLOCK(canvas_surf))
 		SDL_UnlockSurface(canvas_surf);
 }
@@ -178,7 +175,6 @@ init_palette(void)
 		}
 	}
 };
-
 
 void
 bitscope_fini(void)
