@@ -77,6 +77,7 @@ For full legal text see
 	https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt
 -----------------------------------------------------------------------------
 ```
+![CC0 Public Domain](cc0.png)
 
 ## Acknowledgments
 
