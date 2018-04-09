@@ -195,13 +195,6 @@ load_hex(const char *filename, int (*process)(unsigned address, unsigned count, 
 
 failure:
 	fclose(f);
-
-#ifndef NDEBUG
-	/* interactive prompts for errors */
-	printf("Press enter to proceed\n");
-	getchar();
-#endif
-
 	return -1;
 }
 
@@ -211,11 +204,13 @@ bitscope_load(void)
 	int e;
 
 	e = load_hex("ROM.HEX", NULL);
-	fprintf(stderr, "e=%d\n", e);
 	if (e)
 		return -1;
-
+	
+	DBG_LOG("ROM loaded");
+	
 	// TODO: implement this
+	
 	return 0;
 }
 
@@ -230,9 +225,15 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 #endif
 	DBG_LOG("Starting up ...");
 
-	if (bitscope_init())
+	if (bitscope_init()) {
+#ifndef NDEBUG
+		/* interactive prompts for errors */
+		printf("Press enter to proceed\n");
+		getchar();
+#endif
 		return 1;
-
+	}
+	
 	bitscope_loop();
 
 	bitscope_fini();

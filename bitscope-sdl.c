@@ -22,25 +22,41 @@
 static int out_width, out_height, canvas_width, canvas_height;
 static SDL_Window *main_win;
 static SDL_Renderer *main_ren;
-static SDL_Surface *canvas_surf;
+static SDL_Texture *canvas_tex;
 static bool fullscreen;
 static SDL_Color current_palette[256];
+
+// TODO: try to emulate a fantasy video controller 
+struct video_controller {
+	
+	/* timings */
+//	unsigned char vtotal, vactive, vfp, vbp;
+//	unsigned char htotal, hactive, hfp, hbp;
+//	unsigned char clock_select;
+	// TODO: 480x192 - 6x8 font 80x24
+	// TODO: 320x200 - 8x8 font 80x25
+	// TODO: 256x192 - 8x8 font 32x24
+	
+	// CGA CRTC
+//	Vertical total: 7Fh (127)
+//	Vertical total adjust: 06h (6)
+//	Vertical displayed: 64h (100)
+//	Vertical sync position: 70h (112)
+
+	
+//	unsigned char top_border, bottom_border, left_border, right_border;
+	
+	unsigned char vmem[256 * 192]; /* 48KB  VMEM */
+};
+
+static struct video_controller vidcon;
 
 static void
 paint(void)
 {
 	SDL_Rect dstrect;
-	SDL_Texture *canvas_tex;
 
 	DBG_LOG("Painting");
-
-	canvas_tex = SDL_CreateTextureFromSurface(main_ren, canvas_surf);
-	if (!canvas_tex) {
-		DBG_LOG("Failed to create texture: %s", SDL_GetError());
-		return;
-	}
-	if (canvas_tex)
-		DBG_LOG("Texture created!");
 
 	// TODO: scale to aspect ratio
 	dstrect.x = 0;
@@ -52,8 +68,6 @@ paint(void)
 	SDL_RenderClear(main_ren);
 	SDL_RenderCopy(main_ren, canvas_tex, NULL, &dstrect);
 	SDL_RenderPresent(main_ren);
-	
-	SDL_DestroyTexture(canvas_tex);
 }
 
 static void
@@ -61,24 +75,60 @@ update(double dt)
 {
 	void *pixels;
 	int pitch;
+	Uint32 *p;
+	int x, y;
+	unsigned char *vp;
+	int w, h;
+	Uint32 fmt;
+	SDL_PixelFormat *pixfmt;
+	SDL_Rect rect;
+	int access;
+	
+	if (!canvas_tex || !canvas_width || !canvas_height)
+		return;
 	
 	DBG_LOG("Update (%g sec)", dt);
 
-	if (SDL_MUSTLOCK(canvas_surf))
-		SDL_LockSurface(canvas_surf);
-
-	canvas_width = canvas_surf->w;
-	canvas_height = canvas_surf->h;
-	pixels = canvas_surf->pixels;
-	pitch = canvas_surf->pitch;
-
-	if (!pixels || !pitch || !canvas_height || !canvas_width)
+	// TODO:
+	bitscope_paint(vidcon.vmem, canvas_width, canvas_height, canvas_width);
+	
+	if (SDL_QueryTexture(canvas_tex, &fmt, &access, &w, &h)) {
+		DBG_LOG("unabler to query texture: %s", SDL_GetError());
 		return;
+	}
+	DBG_LOG("Texture %dx%d fmt:%#x pitch:%d access:%d", w, h, fmt, pitch, access);
 
-	bitscope_paint(pixels, canvas_width, canvas_height, pitch);
+	if ((SDL_TextureAccess)access != SDL_TEXTUREACCESS_STREAMING) {
+		DBG_LOG("Texture requires streaming access");
+		return;
+	}
+	
+	rect.x = 0;
+	rect.y = 0;
+	rect.w = w;
+	rect.h = h;
+	
+	if (SDL_LockTexture(canvas_tex, &rect, &pixels, &pitch)) {
+		DBG_LOG("Failed to lock texture: %s", SDL_GetError());
+//		return; // BUG: lock texture seems to fail every time
+	}
+	
+	
+	pixfmt = SDL_AllocFormat(fmt);
 
-	if (SDL_MUSTLOCK(canvas_surf))
-		SDL_UnlockSurface(canvas_surf);
+	for (y = 0; y < h; y++) {
+		p = (void*)((char*)pixels + (pitch * y));
+//		memset(p, 0x55, pitch);
+		vp = vidcon.vmem + (canvas_width * y); // TODO: use vidcon's pitch		
+		for (x = 0; x < canvas_width; x++) {
+			SDL_Color color = current_palette[vp[x]];
+			p[x] = SDL_MapRGB(pixfmt, color.r, color.g, color.b);
+		}
+	}
+	SDL_FreeFormat(pixfmt);
+	
+	SDL_UnlockTexture(canvas_tex);
+	
 }
 
 void
@@ -174,14 +224,14 @@ init_palette(void)
 			}
 		}
 	}
-};
+}
 
 void
 bitscope_fini(void)
 {
-	if (canvas_surf)
-		SDL_FreeSurface(canvas_surf);
-	canvas_surf = NULL;
+	if (canvas_tex)
+		SDL_DestroyTexture(canvas_tex);
+	canvas_tex = NULL;
 	if (main_ren)
 		SDL_DestroyRenderer(main_ren);
 	main_ren = NULL;
@@ -216,16 +266,33 @@ bitscope_init(void)
 	main_ren = SDL_CreateRenderer(main_win, -1,
 		SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	
-	canvas_surf = SDL_CreateRGBSurfaceWithFormat(0, canvas_width, canvas_height,
-		8, SDL_PIXELFORMAT_INDEX8);
-	if (!canvas_surf) {
-		DBG_LOG("Failed to initialize surface: %s", SDL_GetError());
+	canvas_tex = SDL_CreateTexture(main_ren, SDL_PIXELFORMAT_RGBA8888, 
+		SDL_TEXTUREACCESS_STREAMING, canvas_width, canvas_height);
+	if (!canvas_tex) {
+		DBG_LOG("Failed to initialize texture: %s", SDL_GetError());
 		goto fail;
 	}
-
-	init_palette();
 	
-	SDL_SetPaletteColors(canvas_surf->format->palette, current_palette, 0, 256);
+	{ /* check that the texture we created is a streaming texture */
+		int access, w, h;
+		
+		if (SDL_QueryTexture(canvas_tex, NULL, &access, &w, &h)) {
+			DBG_LOG("unable to query texture: %s", SDL_GetError());
+			goto fail;
+		}
+		
+		if ((SDL_TextureAccess)access != SDL_TEXTUREACCESS_STREAMING) {
+			DBG_LOG("Texture requires streaming access");
+			goto fail;
+		}
+		
+		if (w < canvas_width || h < canvas_height) {
+			DBG_LOG("Texture is incorrect size");
+			goto fail;
+		}
+	}
+	
+	init_palette();
 	
 	if (bitscope_load())
 		goto fail;
