@@ -1,7 +1,7 @@
 /* console.c : console I/O abstraction - public domain. */
 
 #include <stddef.h>
-#include "pc.h"
+#include "console.h"
 
 /* detect OS */
 #ifdef __linux__ /* Linux (& other POSIX should work too) */
@@ -26,6 +26,8 @@ static int is_tty;
 #elif defined(WIN32) /* Windows */
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
+#  include <stdio.h>
+static BOOL has_console;
 #else
 #  error TODO: implement this
 #endif
@@ -47,13 +49,14 @@ console_init(void)
 #elif USE_STDIO
 	setvbuf(stdout, NULL, _IONBF, 0); /* use interactive unbuffered output */
 #elif defined(WIN32)
-	AllocConsole();
+	has_console = AllocConsole();
 	freopen("CONIN$", "r",stdin);
 	freopen("CONOUT$", "w",stdout);
 	freopen("CONOUT$", "w",stderr);
 #else
 #  error TODO: implement this
 #endif
+	return 0;
 }
 
 int
@@ -64,10 +67,11 @@ console_run(void)
 #elif USE_STDIO
 	abort(); // TODO: implement this
 #elif defined(WIN32)
-#  error TODO: implement this
+		abort(); // TODO: implement this
 #else
 #  error TODO: implement this
 #endif
+	return 0;
 }
 
 void
@@ -80,7 +84,9 @@ console_shutdown(void)
 #elif USE_STDIO
 	setvbuf(stream, NULL, _IOLBF, BUFSIZ); /* return to line-buffered mode */
 #elif defined(WIN32)
-#  error TODO: implement this
+	if (has_console)
+		FreeConsole();
+	has_console = FALSE;
 #else
 #  error TODO: implement this
 #endif
@@ -95,7 +101,9 @@ console_out(const void *b, size_t n)
 #elif USE_STDIO
 	fwrite(b, 1, n, stdout);
 #elif defined(WIN32)
-#  error TODO: implement this
+	/* TODO: use WriteConsole() */
+	fwrite(b, 1, n, stdout);
+	fflush(stdout);
 #else
 #  error TODO: implement this
 #endif
@@ -111,7 +119,8 @@ console_getch(void)
 #elif USE_STDIO
 	return getchar();
 #elif defined(WIN32)
-#  error TODO: implement this
+/* TODO: use ReadConsole() */
+		return getchar();
 #else
 #  error TODO: implement this
 #endif

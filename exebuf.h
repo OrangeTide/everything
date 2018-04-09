@@ -1,3 +1,4 @@
+/* exebuf.h : executable buffers for running native code in VM - public domain */
 #ifndef EXEBUF_H
 #define EXEBUF_H
 #include <stdint.h>
