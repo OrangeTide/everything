@@ -1,33 +1,41 @@
 /* exebuf.c : executable buffers for running native code in VM - public domain */
+#include <assert.h>
 #if _WIN32
-#include <windows.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 #else
-#include <unistd.h>
-#include <sys/mman.h>
+#  include <string.h>
+#  include <unistd.h>
+#  include <sys/mman.h>
 #endif
 
 #include "exebuf.h"
 
-/* we define the structure dynamically based on page size. conceptually:
+/* an opaque structure with no type definition because we cast it to/from a page.
+ * conceptually it is:
  * struct exebuf {
- *     char data[PAGE_SIZE - sizeof(struct exebuf_info)];
  *     struct exebuf_info info;
- * }*/
+ *     unsigned char data[PAGE_SIZE - sizeof(struct exebuf_info)];
+ * };
+ */
 struct exebuf;
-
-/* placed inside of struct exebuf as the end of the page. */
-struct exebuf_info {
-	size_t count;
-};
 
 static size_t pgsz;
 
-static inline struct exebuf_info *exebuf_getinfo(struct exebuf *a)
+/* returns number of bytes remaining. */
+unsigned
+exebuf_remaining(struct exebuf *a)
 {
-	return (struct exebuf_info*)((char*)a + pgsz - sizeof(struct exebuf_info));
+	struct exebuf_info *info;
+
+	info = exebuf_getinfo(a);
+	if (!info || info->count < sizeof(struct exebuf_info))
+		return 0; /* BUG! size must always include info structure. */
+
+	return info->max - info->count;
 }
 
-void
+static void
 exebuf_init(void)
 {
 #if _WIN32
@@ -42,16 +50,29 @@ exebuf_init(void)
 struct exebuf *
 exebuf_create(void)
 {
+	struct exebuf *eb;
+	struct exebuf_info *info;
+
+	if (!pgsz)
+		exebuf_init();
+
 #if _WIN32
-	return VirtualAlloc(NULL, pgsz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	eb = VirtualAlloc(NULL, pgsz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 #else
-	return mmap(NULL, pgsz, PROT_READ | PROT_WRITE,  MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	eb = mmap(NULL, pgsz, PROT_READ | PROT_WRITE,  MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #endif
+
+	info = exebuf_getinfo(eb);
+	info->count = sizeof(struct exebuf_info);
+	info->max = pgsz;
+
+	return eb;
 }
 
 void
 exebuf_free(struct exebuf *buf)
 {
+	assert(pgsz != 0);
 #if _WIN32
 	VirtualFree(buf, 0, MEM_RELEASE);
 #else
@@ -62,10 +83,51 @@ exebuf_free(struct exebuf *buf)
 void
 exebuf_finalize(struct exebuf *buf)
 {
+	assert(pgsz != 0);
 #if _WIN32
 	DWORD old;
 	VirtualProtect(buf, pgsz, PAGE_EXECUTE_READ, &old);
 #else
 	mprotect(buf, pgsz, PROT_READ | PROT_EXEC);
 #endif
+}
+
+/* adds a string/memory */
+int
+exebuf_add(struct exebuf *b, unsigned n, const uint8_t *p)
+{
+	unsigned r = exebuf_remaining(b);
+	struct exebuf_info *info = exebuf_getinfo(b);
+
+	if (n > r)
+		return -1; /* out of space */
+
+#if _WIN32
+	CopyMemory((char*)b + info->count, p, n);
+#else
+	memcpy((char*)b + info->count, p, n);
+#endif
+	info->count += n;
+
+	return 0;
+}
+
+/* align buffer by a power-of-2. */
+int
+exebuf_align(struct exebuf *b, unsigned align)
+{
+	struct exebuf_info *info = exebuf_getinfo(b);
+	unsigned r = exebuf_remaining(b);
+	unsigned n;
+
+	n = info->count & (align - 1);
+	if (!n)
+		return 0; /* already aligned - nothing to do */
+	n = align - n;
+	if (n > r)
+		return -1; /* alignment would exceed buffer */
+	memset((char*)b + info->count, 0, n); /* 0 fill */
+	info->count += n;
+
+	return 0;
 }
