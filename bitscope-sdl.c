@@ -89,7 +89,6 @@ update(double dt)
 	
 	DBG_LOG("Update (%g sec)", dt);
 
-	// TODO:
 	bitscope_paint(vidcon.vmem, canvas_width, canvas_height, canvas_width);
 	
 	if (SDL_QueryTexture(canvas_tex, &fmt, &access, &w, &h)) {
@@ -110,15 +109,13 @@ update(double dt)
 	
 	if (SDL_LockTexture(canvas_tex, &rect, &pixels, &pitch)) {
 		DBG_LOG("Failed to lock texture: %s", SDL_GetError());
-//		return; // BUG: lock texture seems to fail every time
+		return;
 	}
-	
 	
 	pixfmt = SDL_AllocFormat(fmt);
 
 	for (y = 0; y < h; y++) {
 		p = (void*)((char*)pixels + (pitch * y));
-//		memset(p, 0x55, pitch);
 		vp = vidcon.vmem + (canvas_width * y); // TODO: use vidcon's pitch		
 		for (x = 0; x < canvas_width; x++) {
 			SDL_Color color = current_palette[vp[x]];
@@ -128,7 +125,6 @@ update(double dt)
 	SDL_FreeFormat(pixfmt);
 	
 	SDL_UnlockTexture(canvas_tex);
-	
 }
 
 void
