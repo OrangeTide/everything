@@ -40,4 +40,12 @@ exebuf_add_byte(struct exebuf *b, uint8_t data)
 
 	return 0;
 }
+
+/* add unaligned 32-bit number */
+static inline int
+exebuf_add_dword(struct exebuf *b, uint32_t data)
+{
+	return exebuf_add(b, 4, (uint8_t*)&data);
+}
+
 #endif

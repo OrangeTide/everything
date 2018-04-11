@@ -16,6 +16,48 @@
 #  define DBG_LOG(f, ...) fprintf(stderr, f "\n", ## __VA_ARGS__)
 #endif
 
+// TODO: this belongs in codegen.c
+
+static void
+gen_increase_stack(struct exebuf *eb, int amount)
+{
+		exebuf_add_byte(eb, 0x48); // sub rsp, N
+		exebuf_add_byte(eb, 0x81);
+		exebuf_add_byte(eb, 0xec);
+		exebuf_add_dword(eb, amount);
+}
+
+static int
+gen_func_prologue(struct exebuf *eb, int stack)
+{
+	// TODO: Linux ABI redzone
+	// TODO: catch return values and pass errors up.
+	exebuf_add_byte(eb, 0x55); // push rbp
+
+	exebuf_add_byte(eb, 0x48); // mov rbp, rsp
+	exebuf_add_byte(eb, 0x89);
+	exebuf_add_byte(eb, 0xe5);
+
+	if (stack)
+		gen_increase_stack(eb, stack); // sub rsp, N
+
+	return 0;
+}
+
+static int
+gen_func_epilogue(struct exebuf *eb)
+{
+	exebuf_add_byte(eb, 0x48); // mov rsp, rbp
+	exebuf_add_byte(eb, 0x89);
+	exebuf_add_byte(eb, 0xec);
+
+	exebuf_add_byte(eb, 0x5d); // pop rbp
+
+	exebuf_add_byte(eb, 0xc3); // ret
+
+	return 0;
+}
+
 static int
 test_exe(void)
 {
@@ -30,10 +72,14 @@ test_exe(void)
 	// TODO: append some code
 	exebuf_align(eb, 8); /* 8-byte alignment */
 
-	/* generate mov %rdi, %rax */
-	exebuf_add_byte(eb, 0x48); // REX.W prefix
-	exebuf_add_byte(eb, 0x8b); // MOV opcode, reg/reg
-	exebuf_add_byte(eb, 0xc7); // MOD/RM byte for %rdi -> %rax
+	gen_func_prologue(eb, 0);
+
+	/* DEMO: generate mov %rdi, %rax */
+	exebuf_add_byte(eb, 0x48);
+	exebuf_add_byte(eb, 0x8b);
+	exebuf_add_byte(eb, 0xc7);
+
+	gen_func_epilogue(eb);
 
 	// TODO: execute code
 
