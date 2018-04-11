@@ -27,11 +27,21 @@ gen_increase_stack(struct exebuf *eb, int amount)
 		exebuf_add_dword(eb, amount);
 }
 
-static int
+static void *
 gen_func_prologue(struct exebuf *eb, int stack)
 {
+	void *func;
+
+	exebuf_align(eb, 8); /* 8-byte alignment */
+
+	func = exebuf_mark(eb);
+
 	// TODO: Linux ABI redzone
 	// TODO: catch return values and pass errors up.
+
+	// TODO: Linux ABI parameters:  RDI, RSI, RDX, RCX, R8, R9
+	// TODO: Microsoft ABI parameters:  RCX, RDX, R8, R9
+
 	exebuf_add_byte(eb, 0x55); // push rbp
 
 	exebuf_add_byte(eb, 0x48); // mov rbp, rsp
@@ -41,10 +51,10 @@ gen_func_prologue(struct exebuf *eb, int stack)
 	if (stack)
 		gen_increase_stack(eb, stack); // sub rsp, N
 
-	return 0;
+	return func;
 }
 
-static int
+static void
 gen_func_epilogue(struct exebuf *eb)
 {
 	exebuf_add_byte(eb, 0x48); // mov rsp, rbp
@@ -54,41 +64,66 @@ gen_func_epilogue(struct exebuf *eb)
 	exebuf_add_byte(eb, 0x5d); // pop rbp
 
 	exebuf_add_byte(eb, 0xc3); // ret
-
-	return 0;
 }
+
+/* simple Linux function:
+ *
+ *  0:   55                      push   rbp
+ *  1:   48 89 e5                mov    rbp,rsp
+ *  4:   b8 40 e2 01 00          mov    eax,0x1e240
+ *  9:   5d                      pop    rbp
+ *  a:   c3                      ret
+ *
+ * simple Windows function:
+ *
+ * TBD
+ *
+ */
 
 static int
 test_exe(void)
 {
 	struct exebuf *eb;
+	int (*myfunc)(void);
+	int result;
 
 	eb = exebuf_create();
 	if (!eb) {
 		DBG_LOG("exebuf allocation failure");
-		return -1;
+		goto test_failure;
 	}
 
 	// TODO: append some code
-	exebuf_align(eb, 8); /* 8-byte alignment */
 
-	gen_func_prologue(eb, 0);
+	myfunc = gen_func_prologue(eb, 0);
+	if (!myfunc)
+		goto test_failure;
 
-	/* DEMO: generate mov %rdi, %rax */
-	exebuf_add_byte(eb, 0x48);
-	exebuf_add_byte(eb, 0x8b);
-	exebuf_add_byte(eb, 0xc7);
+	/* DEMO: try to return a value from our function (currently broken!) */
+	exebuf_add_byte(eb, 0xb8); // mov eax, 123456
+	exebuf_add_dword(eb, 123456);
 
 	gen_func_epilogue(eb);
 
-	// TODO: execute code
+	if (exebuf_check(eb))
+		goto test_failure; /* earlier errors appending to buffer */
 
 	exebuf_finalize(eb);
 
-	// TODO: read return value
+	result = myfunc();
+
+	DBG_LOG("result=%d", (int)result);
 
 	exebuf_free(eb);
+
+	if (result != 123456)
+		goto test_failure;
+
+	DBG_LOG("TEST PASSED");
 	return 0;
+test_failure:
+	DBG_LOG("TEST FAILURE!");
+	return -1;
 }
 
 void
@@ -131,7 +166,14 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 #endif
 	DBG_LOG("Starting up ...");
 
-	test_exe(); // TODO: remove this test code
+	if (test_exe()) { // TODO: remove this test code
+#ifndef NDEBUG
+		/* interactive prompts for errors */
+		printf("Press enter to proceed\n");
+		getchar();
+#endif
+		return 1;
+	}
 
 	if (bitscope_init()) {
 #ifndef NDEBUG

@@ -20,8 +20,6 @@
  */
 struct exebuf;
 
-static size_t pgsz;
-
 /* returns number of bytes remaining. */
 unsigned
 exebuf_remaining(struct exebuf *a)
@@ -35,26 +33,22 @@ exebuf_remaining(struct exebuf *a)
 	return info->max - info->count;
 }
 
-static void
-exebuf_init(void)
-{
-#if _WIN32
-	SYSTEM_INFO sSysInfo;
-	GetSystemInfo(&sSysInfo);
-	pgsz = sSysInfo.dwPageSize;
-#else
-	pgsz = sysconf(_SC_PAGESIZE);
-#endif
-}
-
 struct exebuf *
 exebuf_create(void)
 {
 	struct exebuf *eb;
 	struct exebuf_info *info;
+	static size_t pgsz;
 
-	if (!pgsz)
-		exebuf_init();
+	if (!pgsz) {
+#if _WIN32
+		SYSTEM_INFO sSysInfo;
+		GetSystemInfo(&sSysInfo);
+		pgsz = sSysInfo.dwPageSize;
+#else
+		pgsz = sysconf(_SC_PAGESIZE);
+#endif
+	}
 
 #if _WIN32
 	eb = VirtualAlloc(NULL, pgsz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -65,6 +59,7 @@ exebuf_create(void)
 	info = exebuf_getinfo(eb);
 	info->count = sizeof(struct exebuf_info);
 	info->max = pgsz;
+	info->error = 0;
 
 	return eb;
 }
@@ -72,23 +67,27 @@ exebuf_create(void)
 void
 exebuf_free(struct exebuf *buf)
 {
-	assert(pgsz != 0);
+	struct exebuf_info *info = exebuf_getinfo(buf);
+
+	assert(info->max != 0);
 #if _WIN32
 	VirtualFree(buf, 0, MEM_RELEASE);
 #else
-	munmap(buf, pgsz);
+	munmap(buf, info->max);
 #endif
 }
 
 void
 exebuf_finalize(struct exebuf *buf)
 {
-	assert(pgsz != 0);
+	struct exebuf_info *info = exebuf_getinfo(buf);
+
+	assert(info->max != 0);
 #if _WIN32
 	DWORD old;
-	VirtualProtect(buf, pgsz, PAGE_EXECUTE_READ, &old);
+	VirtualProtect(buf, info->max, PAGE_EXECUTE_READ, &old);
 #else
-	mprotect(buf, pgsz, PROT_READ | PROT_EXEC);
+	mprotect(buf, info->max, PROT_READ | PROT_EXEC);
 #endif
 }
 
@@ -99,8 +98,10 @@ exebuf_add(struct exebuf *b, unsigned n, const uint8_t *p)
 	unsigned r = exebuf_remaining(b);
 	struct exebuf_info *info = exebuf_getinfo(b);
 
-	if (n > r)
+	if (n > r || info->error) {
+		info->error = 1;
 		return -1; /* out of space */
+	}
 
 #if _WIN32
 	CopyMemory((char*)b + info->count, p, n);
@@ -124,8 +125,10 @@ exebuf_align(struct exebuf *b, unsigned align)
 	if (!n)
 		return 0; /* already aligned - nothing to do */
 	n = align - n;
-	if (n > r)
+	if (n > r || info->error) {
+		info->error = 1;
 		return -1; /* alignment would exceed buffer */
+	}
 	memset((char*)b + info->count, 0, n); /* 0 fill */
 	info->count += n;
 

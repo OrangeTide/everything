@@ -9,7 +9,8 @@ struct exebuf;
 /* placed inside of struct exebuf as the end of the page. */
 struct exebuf_info {
 	size_t count;
-	size_t max;
+	size_t max; /* will be in multiples of PAGE_SIZE */
+	int error;
 };
 
 struct exebuf *exebuf_create(void);
@@ -21,9 +22,26 @@ int exebuf_align(struct exebuf *b, unsigned align);
 
 /* access the meta data found at the beginning of the page */
 static inline struct exebuf_info *
-exebuf_getinfo(struct exebuf *b)
+exebuf_getinfo(const struct exebuf *b)
 {
 	return (struct exebuf_info*)b;
+}
+
+static inline int
+exebuf_check(const struct exebuf *b)
+{
+	const struct exebuf_info *info = exebuf_getinfo(b);
+
+	return info->error;
+}
+
+/* returns a pointer to the current position in the buffer, intended to be used as an entry point. */
+static inline void *
+exebuf_mark(struct exebuf *b)
+{
+	struct exebuf_info *info = exebuf_getinfo(b);
+
+	return info->error ? NULL : (char*)b + info->count;
 }
 
 /* add a single byte */
@@ -33,8 +51,10 @@ exebuf_add_byte(struct exebuf *b, uint8_t data)
 	unsigned r = exebuf_remaining(b);
 	struct exebuf_info *info = exebuf_getinfo(b);
 
-	if (!r)
+	if (!r || info->error) {
+		info->error = 1;
 		return -1;
+	}
 
 	((char*)b)[info->count++] = data;
 
