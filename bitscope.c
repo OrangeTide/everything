@@ -1,5 +1,7 @@
 /* bitscope.c : retrocomputer - public domain. */
+#include <assert.h>
 #include <stdio.h>
+#include <stddef.h>
 
 #include "bitscope.h"
 #include "ihex.h"
@@ -41,6 +43,14 @@ gen_func_prologue(struct exebuf *eb, int stack)
 
 	// TODO: Linux ABI parameters:  RDI, RSI, RDX, RCX, R8, R9
 	// TODO: Microsoft ABI parameters:  RCX, RDX, R8, R9
+
+	// TODO: if we know there will not be any use of stack or push/pop then we can eliminate all code
+
+///// example of a minimal function on Linux:
+/////     int test3(struct foo *f) { f->pc++; return 4; }
+// 66 83 47 0a 01          add    WORD PTR [rdi+0xa],0x1
+// b8 04 00 00 00          mov    eax,0x4
+// c3                      ret
 
 	exebuf_add_byte(eb, 0x55); // push rbp
 
@@ -170,9 +180,52 @@ static int
 		goto failure;
 
 	exebuf_add_byte(eb, 0xb8); // mov eax, -1
-	exebuf_add_dword(eb, (unsigned)(-1l)); /* return -1 */
+	exebuf_add_dword(eb, (unsigned)(-1l)); /* will return -1 */
 
 	// TODO: good routines must increment cpu->PC
+
+	gen_func_epilogue(eb);
+
+	return myfunc;
+failure:
+	return NULL;
+}
+
+static int
+(*gen_opc_di(struct exebuf *eb))(z_cpu_t*)
+{
+	void *myfunc;
+
+	myfunc = gen_func_prologue(eb, 0);
+	if (!myfunc)
+		goto failure;
+
+	// TODO: must increment cpu->PC
+
+	DBG_LOG("TODO: add WORD PTR [rdi+%d], 1", (int)offsetof(z_cpu_t, PC));
+	// TODO: implement windows version
+	exebuf_add_byte(eb, 0x66); // Linux version
+	exebuf_add_byte(eb, 0x83); //
+	exebuf_add_byte(eb, 0x47); //
+	assert(offsetof(z_cpu_t, PC) <= 255);
+	exebuf_add_byte(eb, offsetof(z_cpu_t, PC));
+	exebuf_add_byte(eb, 0x01); //
+
+
+///// without optimization
+// 48 89 7d f8             mov    QWORD PTR [rbp-0x8],rdi
+// 48 8b 45 f8             mov    rax,QWORD PTR [rbp-0x8]
+// 0f b7 40 0a             movzx  eax,WORD PTR [rax+0xa]
+// 8d 50 01                lea    edx,[rax+0x1]
+// 48 8b 45 f8             mov    rax,QWORD PTR [rbp-0x8]
+// 66 89 50 0a             mov    WORD PTR [rax+0xa],dx
+///// with optimization
+// 66 83 47 0a 01          add    WORD PTR [rdi+0xa],0x1
+
+	exebuf_add_byte(eb, 0xb8); // mov eax,
+	exebuf_add_dword(eb, (unsigned)(-1l)); /* will return -1 */
+	// HACK, must return error until we fix the PC++ code above
+	// exebuf_add_dword(eb, (unsigned)(4)); /* will return 4 */
 
 	gen_func_epilogue(eb);
 
@@ -184,8 +237,9 @@ failure:
 int
 z_init(z_cpu_t *cpu)
 {
-	struct exebuf * eb = NULL;
+	struct exebuf *eb = NULL;
 	int opc;
+	void *bad;
 
 	if (cpu->initialized)
 		return -1; // TODO: this function doesn't support re-initialization
@@ -196,9 +250,21 @@ z_init(z_cpu_t *cpu)
 		goto failure;
 	}
 
+#if 0 // these generated functions are broken and cause crashes on windows ...
+	bad = gen_bad_opcode(eb);
+
 	/* initialize the opcode table */
-	opc = 0;
-	cpu->opcodes[opc++] = gen_bad_opcode(eb);
+	for (opc = 0; opc < 256; opc++) {
+			cpu->opcodes[opc] = bad; // reuses the same entry point
+	}
+
+	cpu->opcodes[0xf3 /* DI */] = gen_opc_di(eb);
+
+	if (exebuf_check(eb)) {
+		DBG_LOG("exebuf error (buffer overflow?)");
+		goto failure; /* probably overflowed the page we allocated for this */
+	}
+#endif
 
 	cpu->buf = eb;
 
@@ -251,8 +317,10 @@ z_run(z_cpu_t *cpu)
 	func = z_lookup(cpu, cpu->PC);
 
 	/* run a single opcode at PC */
-	if (func) {
+	if (!func) {
 		BYTE opc = cpu->ram[cpu->PC]; // TODO: bounds checking!
+
+		DBG_LOG("OPCODE $%02X", (int)opc);
 		func = cpu->opcodes[opc];
 	}
 
@@ -265,7 +333,7 @@ z_run(z_cpu_t *cpu)
 	/* run the compiled sub-routine or opcode */
 	result = func(cpu);
 	if (result < 0) {
-		DBG_LOG("Instruction failure near 5$%04X", cpu->PC);
+		DBG_LOG("Instruction failure near $%04X", cpu->PC);
 		return -1;
 	}
 	cpu->cycles += result;
@@ -313,7 +381,9 @@ bitscope_paint(unsigned char *pixels, unsigned width, unsigned height, unsigned 
 
 	for (y = 0, p = pixels; y < height; y++, p = (void*)((char*)p + pitch))
 		for (x = 0; x < width; x++)
-			p[x] = x ^ y;
+			// p[x] = x ^ y; // cool colorful pattern
+			p[x] = x & y & 1 ? 0 : 15; // black and white square pattern
+			// p[x] = (x ^ y) & 8 ? 0 : 15; // checkerboard pattern
 
 	// z_run(current_cpu);
 }
