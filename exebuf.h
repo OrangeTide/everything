@@ -11,6 +11,7 @@ struct exebuf_info {
 	size_t count;
 	size_t max; /* will be in multiples of PAGE_SIZE */
 	int error;
+	void *extra; /* a user pointer that is free for any purpose. */
 };
 
 struct exebuf *exebuf_create(void);
@@ -68,4 +69,27 @@ exebuf_add_dword(struct exebuf *b, uint32_t data)
 	return exebuf_add(b, 4, (uint8_t*)&data);
 }
 
+static inline void *
+exebug_getextra(const struct exebuf *b)
+{
+	const struct exebuf_info *info = exebuf_getinfo(b);
+
+	return info ? info->extra : NULL;
+}
+
+/* returns the old pointer */
+static inline void *
+exebug_setextra(struct exebuf *b, void *extra)
+{
+	struct exebuf_info *info = exebuf_getinfo(b);
+	void *old;
+
+	if (!info)
+		return NULL;
+
+	old = info->extra;
+	info->extra = extra;
+
+	return old;
+}
 #endif

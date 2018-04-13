@@ -126,6 +126,185 @@ test_failure:
 	return -1;
 }
 
+// TODO: this belongs in z80.c
+
+typedef uint16_t WORD;
+typedef uint8_t BYTE;
+
+typedef struct z_cpu z_cpu_t;
+
+static z_cpu_t *current_cpu; /* used by process_rom_data */
+
+struct z_cpu {
+	BYTE W, Z, Wp, Zp, B, C, Bp, Cp, D, E, Dp, Ep, H, L, Hp, Lp, A, F, Ap, Fp;
+	WORD IX, IY, SP, PC;
+
+	struct exebuf *buf; /* native buffer for all our opcodes */
+
+	int (*opcodes[256])(z_cpu_t *cpu); /* function entry points */
+
+	unsigned long cycles;
+	int initialized;
+	BYTE ram[65536]; // TODO: support banked memory
+};
+
+
+/* resets the CPU */
+void
+z_reset(z_cpu_t *cpu)
+{
+	cpu->PC = 0;
+	cpu->F = cpu->Fp = 0;
+	cpu->A = cpu->Ap = 0;
+
+	// TODO: initialize registers
+}
+
+static int
+(*gen_bad_opcode(struct exebuf *eb))(z_cpu_t*)
+{
+	void *myfunc;
+
+	myfunc = gen_func_prologue(eb, 0);
+	if (!myfunc)
+		goto failure;
+
+	exebuf_add_byte(eb, 0xb8); // mov eax, -1
+	exebuf_add_dword(eb, (unsigned)(-1l)); /* return -1 */
+
+	// TODO: good routines must increment cpu->PC
+
+	gen_func_epilogue(eb);
+
+	return myfunc;
+failure:
+	return NULL;
+}
+
+int
+z_init(z_cpu_t *cpu)
+{
+	struct exebuf * eb = NULL;
+	int opc;
+
+	if (cpu->initialized)
+		return -1; // TODO: this function doesn't support re-initialization
+
+	eb = exebuf_create();
+	if (!eb) {
+		DBG_LOG("exebuf allocation failure");
+		goto failure;
+	}
+
+	/* initialize the opcode table */
+	opc = 0;
+	cpu->opcodes[opc++] = gen_bad_opcode(eb);
+
+	cpu->buf = eb;
+
+	cpu->initialized = 1;
+	return 0;
+
+failure:
+	exebuf_free(eb);
+	return -1;
+}
+
+void
+z_free(z_cpu_t *cpu)
+{
+	if (!cpu)
+		return;
+	exebuf_free(cpu->buf);
+	free(cpu);
+}
+
+/* finds routine associated with address. return  NULL if not found. */
+static int
+(*z_lookup(z_cpu_t *cpu __attribute__((unused)), unsigned address __attribute__((unused))))(z_cpu_t*)
+{
+	return NULL; // TODO: implement the address look-up hash-table or whatever
+}
+
+z_cpu_t *
+z_new(void)
+{
+	z_cpu_t *cpu = calloc(1, sizeof(*cpu));
+
+	z_init(cpu);
+
+	return cpu;
+}
+
+static
+int
+z_run(z_cpu_t *cpu)
+{
+	int result;
+	int (*func)(z_cpu_t*);
+
+	if (!cpu->initialized) {
+		DBG_LOG("cannot run: Z-CPU not initialized");
+		return -1;
+	}
+
+	func = z_lookup(cpu, cpu->PC);
+
+	/* run a single opcode at PC */
+	if (func) {
+		BYTE opc = cpu->ram[cpu->PC]; // TODO: bounds checking!
+		func = cpu->opcodes[opc];
+	}
+
+	/* bail if there is still no valid routine */
+	if (!func) {
+		DBG_LOG("Unknown opcode at $%04X", cpu->PC);
+		return -1; /* fault: we can't run */
+	}
+
+	/* run the compiled sub-routine or opcode */
+	result = func(cpu);
+	if (result < 0) {
+		DBG_LOG("Instruction failure near 5$%04X", cpu->PC);
+		return -1;
+	}
+	cpu->cycles += result;
+
+	// TODO: keep going until we run out of cycles
+
+	return 0; // TODO: implement this */
+}
+
+/* callback used with ihex_load().
+ * copies ROM data into RAM */
+static int
+process_rom_data(unsigned address, unsigned count, unsigned char *data)
+{
+	if (address + count > sizeof(current_cpu->ram))
+		return -1;
+
+	memcpy(current_cpu->ram + address, data, count);
+
+	return 0;
+}
+
+int
+bitscope_load(void)
+{
+	int e;
+
+	current_cpu = z_new();
+	e = ihex_load("ROM.HEX", process_rom_data);
+	if (e)
+		return -1;
+
+	DBG_LOG("ROM loaded");
+
+	return 0;
+}
+
+// MAIN
+
 void
 bitscope_paint(unsigned char *pixels, unsigned width, unsigned height, unsigned pitch)
 {
@@ -136,22 +315,7 @@ bitscope_paint(unsigned char *pixels, unsigned width, unsigned height, unsigned 
 		for (x = 0; x < width; x++)
 			p[x] = x ^ y;
 
-}
-
-int
-bitscope_load(void)
-{
-	int e;
-
-	e = ihex_load("ROM.HEX", NULL /* TODO: use a handler */);
-	if (e)
-		return -1;
-
-	DBG_LOG("ROM loaded");
-
-	// TODO: implement this
-
-	return 0;
+	// z_run(current_cpu);
 }
 
 int
@@ -184,7 +348,12 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		return 1;
 	}
 
+	z_run(current_cpu);
+
 	bitscope_loop();
+
+	z_free(current_cpu);
+	current_cpu = NULL;
 
 	bitscope_fini();
 
