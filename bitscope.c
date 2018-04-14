@@ -115,10 +115,10 @@ test_exe(void)
 
 	gen_func_epilogue(eb);
 
+	exebuf_finalize(eb);
+
 	if (exebuf_check(eb))
 		goto test_failure; /* earlier errors appending to buffer */
-
-	exebuf_finalize(eb);
 
 	result = myfunc();
 
@@ -250,21 +250,21 @@ z_init(z_cpu_t *cpu)
 		goto failure;
 	}
 
-#if 0 // these generated functions are broken and cause crashes on windows ...
+	/* initialize the opcode table with bad results */
 	bad = gen_bad_opcode(eb);
-
-	/* initialize the opcode table */
 	for (opc = 0; opc < 256; opc++) {
 			cpu->opcodes[opc] = bad; // reuses the same entry point
 	}
 
+	/* initialize good results */
 	cpu->opcodes[0xf3 /* DI */] = gen_opc_di(eb);
+
+	exebuf_finalize(eb);
 
 	if (exebuf_check(eb)) {
 		DBG_LOG("exebuf error (buffer overflow?)");
 		goto failure; /* probably overflowed the page we allocated for this */
 	}
-#endif
 
 	cpu->buf = eb;
 

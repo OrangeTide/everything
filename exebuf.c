@@ -83,6 +83,7 @@ exebuf_finalize(struct exebuf *buf)
 	struct exebuf_info *info = exebuf_getinfo(buf);
 
 	assert(info->max != 0);
+	info->finalized = 1;
 #if _WIN32
 	DWORD old;
 	VirtualProtect(buf, info->max, PAGE_EXECUTE_READ, &old);

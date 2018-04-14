@@ -10,7 +10,7 @@ struct exebuf;
 struct exebuf_info {
 	size_t count;
 	size_t max; /* will be in multiples of PAGE_SIZE */
-	int error;
+	int error, finalized;
 	void *extra; /* a user pointer that is free for any purpose. */
 };
 
@@ -28,12 +28,13 @@ exebuf_getinfo(const struct exebuf *b)
 	return (struct exebuf_info*)b;
 }
 
+/* return 0 if there are no errors and buffer is ready to use. */
 static inline int
 exebuf_check(const struct exebuf *b)
 {
 	const struct exebuf_info *info = exebuf_getinfo(b);
 
-	return info->error;
+	return info->error || !info->finalized;
 }
 
 /* returns a pointer to the current position in the buffer, intended to be used as an entry point. */
