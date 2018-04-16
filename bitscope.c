@@ -392,12 +392,6 @@ int
 main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 {
 	console_init();
-#if !defined(NDEBUG) && defined(WIN32)
-	AllocConsole();
-	freopen("CONIN$", "r",stdin);
-	freopen("CONOUT$", "w",stdout);
-	freopen("CONOUT$", "w",stderr);
-#endif
 	DBG_LOG("Starting up ...");
 
 	if (test_exe()) { // TODO: remove this test code
