@@ -52,18 +52,21 @@ ifeq ($(OS),Windows_NT)
 	# glu
 	PKGCFLAGS.glu32 =
 	PKGLIBS.glu32 = -lglu32
+	# gl - an alias for what we typically consider OpenGL
+	PKGCFLAGS.gl = $(PKGCFLAGS.opengl32) $(PKGCFLAGS.glu32)
+	PKGLIBS.gl = $(PKGLIBS.opengl32) $(PKGLIBS.glu32)
 	# mintaro
 	PKGCFLAGS.mintaro =
 	PKGLIBS.mintaro = -lgdi32
 	# curses
 	PKGCFLAGS.curses =
 	PKGLIBS.curses = -lpdcurses
-	# sdl2
+	# sdl2-static
+	PKGCFLAGS.sdl2-static =
+	PKGLIBS.sdl2-static = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc	
+	# sdl2 (dynamic)
 	PKGCFLAGS.sdl2 =
-	## dynamic:
-	# PKGLIBS.sdl2 = -lmingw32 -lSDL2main -lSDL2
-	# static:
-	PKGLIBS.sdl2 = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc	
+	PKGLIBS.sdl2 = -lmingw32 -lSDL2main -lSDL2
 else ifeq ($(OS),Linux)
 	# mintaro
 	PKGLIBS.mintaro = -lX11 -lXext -lasound -lpthread -lm
