@@ -109,7 +109,6 @@ define gen-target
 $(info Generating rules for $1 ... $($1.EXEC) : $($1.SRCS))
 $($1.EXEC) : $($1.SRCS)
 	$(CC) -o $$@ $$^ $($1.CFLAGS) $($1.LDFLAGS)
-	$(STRIP) -S $$@
 all :: $($1.EXEC)
 clean ::
 	$(RM) $$($1.EXEC) $$($1.OBJS)
