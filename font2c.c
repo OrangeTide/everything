@@ -49,13 +49,17 @@ open_out(const char *name)
 static void
 cleanup_state(struct state *st)
 {
+	if (!st)
+		return;
+	if (st->bmp_data)
+		free(st->bmp_data);
+	st->bmp_data = NULL;
 	if (st->outf)
 		fclose(st->outf);
 	st->outf = NULL;
 	if (st->inf)
 		fclose(st->inf);
 	st->inf = NULL;
-
 }
 
 static int
