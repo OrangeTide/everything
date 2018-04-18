@@ -11,6 +11,7 @@
 static bool fullscreen = false;
 static SDL_Window *main_win;
 static SDL_GLContext main_ctx;
+static SDL_AudioDeviceID audio_device;
 
 void
 engine_fini(void)
@@ -28,7 +29,7 @@ engine_fini(void)
 int
 engine_init(void)
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO)) {
 		DBG_LOG("Failed to initialize SDL: %s", SDL_GetError());
 		return -1;
 	}
@@ -140,11 +141,28 @@ engine_texture_loadfile(const char *filename)
 
 	// TODO: support other file types ...
 	surf = SDL_LoadBMP(filename);
+	if (!surf) {
+		DBG_LOG("ERROR:%s:%s", filename, SDL_GetError());
+		return -1;
+	}
 
-	if (surf->format->BytesPerPixel == 4) {
+	DBG_LOG("image %dx%d,%d\n", surf->w, surf->h, 8 * surf->format->BytesPerPixel);
+
+	switch (surf->format->BytesPerPixel) {
+	case 4:
 		mode = GL_RGBA;
-	} else {
+		break;
+	case 3:
 		mode = GL_RGB;
+		break;
+	case 1:
+		mode = GL_RED; /* one channel / intensity - shader will have to deal with palette */
+		break;
+	default:
+		DBG_LOG("ERROR:%s:unsupported image depth %d",
+			filename, surf->format->BytesPerPixel);
+		SDL_FreeSurface(surf);
+		return -1;
 	}
 
 	glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
@@ -152,4 +170,64 @@ engine_texture_loadfile(const char *filename)
 	SDL_FreeSurface(surf);
 
 	return 0;
+}
+
+#if 0 // TODO: implement this
+
+#define ENGINE_AUDIO_CHANNEL_MAX 2 /* if >2 we should use OpenAL or SDL_mixer instead */
+static float channel_volume[ENGINE_AUDIO_CHANNEL_MAX]; /* 0 = off, 1.0 = silence */
+static engine_audio_callback_t channel_callback[ENGINE_AUDIO_CHANNEL_MAX];
+static int channel_count;
+
+/* callback for SDL audio - calls all our other callbacks and mixes them */
+static void channel_mixer_cb(void *extra, Uint8 *stream, int len)
+{
+    extern SDL_AudioFormat deviceFormat; // TODO: get this
+    Uint8 mix[len];
+
+	memset(stream, 0, len); /* fill base with silence */
+
+	/* mix in every channel */
+	for (i = 0; i < channel_count; i++) {
+		int volume = channel_volume[i] * SDL_MIX_MAXVOLUME;
+		if (volume <= 0)
+			continue;
+		channel_callback[i](extra, mix, len);
+		SDL_MixAudioFormat(stream, mix, deviceFormat, len, volume);
+	}
+}
+#endif
+
+int engine_audio_start(engine_audio_callback_t *cb, void *extra)
+{
+	SDL_AudioSpec desired, obtained;
+
+	memset(&desired, 0, sizeof(desired));
+	desired.freq = 44100;
+	desired.format = AUDIO_S16;
+	desired.channels = 2;
+	desired.samples = 256;
+	desired.callback = cb; // TODO: assign cb to a channel and channel_mixer to wrap.
+	desired.userdata = extra;
+
+	audio_device = SDL_OpenAudioDevice(NULL, 0, &desired, &obtained, 0);
+	if (!audio_device) {
+		DBG_LOG("Failed to open audio: %s", SDL_GetError());
+		return -1;
+	}
+
+	SDL_PauseAudioDevice(audio_device, 0); /* start playing */
+
+	return 0;
+}
+
+/* pause=1, pause audio playback. pause=0, resume audio playback */
+void engine_audio_pause(int pause)
+{
+	SDL_PauseAudioDevice(audio_device, pause);
+}
+
+void engine_audio_stop(void)
+{
+	SDL_CloseAudioDevice(audio_device);
 }

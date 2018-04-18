@@ -45,6 +45,21 @@ struct { unsigned r:8, g:8, b:8; } palette[] = {
 	{ 0xfd, 0xf6, 0xe3, }, // white
 };
 
+static engine_audio_callback_t rpg_playback;
+static void rpg_playback(void *extra __attribute__((unused)), uint8_t *stream, int len)
+{
+	int i;
+	uint16_t *_stream = (void*)stream;
+	int volume = 10; /* 10% level */
+
+	/* make some white noise ... */
+	for (i = 0; i < len; i += 4) {
+		signed short sample = ((rand() % 65536) - 32768) * volume / 100;
+		_stream[i] = sample; /* left */
+		_stream[i + 1] = sample; /* right */
+	}
+}
+
 void
 screen_fill(unsigned char ch, unsigned char fg, unsigned char bg)
 {
@@ -61,6 +76,8 @@ screen_fill(unsigned char ch, unsigned char fg, unsigned char bg)
 void
 rpg_fini(void)
 {
+	engine_audio_stop();
+
 	/* disable and free our sprite sheet */
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDeleteTextures(1, &sheet_tex);
@@ -82,6 +99,11 @@ rpg_init(void)
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	/* audio setup */
+// DISABLED AUDIO:	engine_audio_start(rpg_playback, NULL);
+
+	return 0;
 }
 
 /* update the game state */
