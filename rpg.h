@@ -14,11 +14,14 @@
 #define RPG_OUT_WIDTH 800
 #define RPG_OUT_HEIGHT 600
 
-void rpg_fini(void);
-int rpg_init(void);
-int rpg_loop(void);
+void engine_fini(void);
+int engine_init(void);
+int engine_loop(void);
+int engine_texture_loadfile(const char *filename);
 
 void rpg_update(double elapsed);
 int rpg_paint(void);
+void rpg_fini(void);
+int rpg_init(void);
 
 #endif

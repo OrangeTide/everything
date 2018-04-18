@@ -3,6 +3,8 @@
 #include <stdbool.h>
 
 #include <SDL2/SDL.h>
+#include <GL/gl.h>
+#include <GL/glext.h>
 
 #include "rpg.h"
 
@@ -11,7 +13,7 @@ static SDL_Window *main_win;
 static SDL_GLContext main_ctx;
 
 void
-rpg_fini(void)
+engine_fini(void)
 {
 	if (main_ctx)
 		SDL_GL_DeleteContext(main_ctx);
@@ -20,11 +22,11 @@ rpg_fini(void)
 		SDL_DestroyWindow(main_win);
 	main_win = NULL;
 
-	SDL_Quit();
+	SDL_Quit(); // TODO: fix the issue that we're calling SDL_Quit multiple times on the error paths
 }
 
 int
-rpg_init(void)
+engine_init(void)
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
 		DBG_LOG("Failed to initialize SDL: %s", SDL_GetError());
@@ -59,7 +61,7 @@ rpg_init(void)
 
 	return 0;
 fail:
-	rpg_fini();
+	engine_fini();
 	return -1;
 }
 
@@ -67,7 +69,7 @@ fail:
  * return 0 on quit, non-zero on error.
  */
 int
-rpg_loop(void)
+engine_loop(void)
 {
 	SDL_Event e;
 	Uint64 prev, now, freq = SDL_GetPerformanceFrequency();
@@ -127,4 +129,27 @@ rpg_loop(void)
 		}
 	}
 	return -1;
+}
+
+/* load a texture from a file to currently bound texture */
+int
+engine_texture_loadfile(const char *filename)
+{
+	SDL_Surface *surf;
+	GLint mode;
+
+	// TODO: support other file types ...
+	surf = SDL_LoadBMP(filename);
+
+	if (surf->format->BytesPerPixel == 4) {
+		mode = GL_RGBA;
+	} else {
+		mode = GL_RGB;
+	}
+
+	glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
+
+	SDL_FreeSurface(surf);
+
+	return 0;
 }
