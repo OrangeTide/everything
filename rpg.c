@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <SDL2/SDL.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
 
@@ -12,83 +11,110 @@
 #  include <windows.h>
 #endif
 
-#ifdef NDEBUG
-#  define DBG_LOG(...) /* disabled */
-#else
-#  define DBG_LOG(f, ...) fprintf(stderr, f "\n", ## __VA_ARGS__)
-// #define DBG_LOG(...) SDL_Log(__VA_ARGS__)
-#endif
-
 #include "rpg.h"
 
-#define RPG_WINDOW_TITLE "RPG: The Adventure"
-#define RPG_OUT_WIDTH 800
-#define RPG_OUT_HEIGHT 600
+#define SCREEN_W 40
+#define SCREEN_H 30
 
-static bool fullscreen = false;
-static SDL_Window *main_win;
-static SDL_GLContext main_ctx;
+struct screen_cell {
+	unsigned fg:4;
+	unsigned bg:4;
+	unsigned char ch;
+} __attribute__((packed));
+
+static GLuint sheet_tex = 0;
+static struct screen_cell screen[SCREEN_H][SCREEN_W];
+
+/* palette colors (Solarized Light) */
+struct { unsigned r:8, g:8, b:8; } palette[] = {
+	{ 0x07, 0x36, 0x42, }, // black
+	{ 0x26, 0x8b, 0xd2, }, // blue
+	{ 0x85, 0x99, 0x00, }, // green
+	{ 0x2a, 0xa1, 0x98, }, // cyan
+	{ 0xdc, 0x32, 0x2f, }, // red
+	{ 0xd3, 0x36, 0x82, }, // magenta
+	{ 0xb5, 0x89, 0x00, }, // yellow
+	{ 0xee, 0xe8, 0xd5, }, // grey
+	{ 0x00, 0x2b, 0x36, }, // dk grey
+	{ 0x83, 0x94, 0x96, }, // br blue
+	{ 0x58, 0x6e, 0x75, }, // br green
+	{ 0x93, 0xa1, 0xa1, }, // br cyan
+	{ 0xcb, 0x4b, 0x16, }, // br red
+	{ 0x6c, 0x71, 0xc4, }, // br magenta
+	{ 0x65, 0x7b, 0x83, }, // br yellow
+	{ 0xfd, 0xf6, 0xe3, }, // white
+};
+
+static engine_audio_callback_t rpg_playback;
+static void rpg_playback(void *extra __attribute__((unused)), uint8_t *stream, int len)
+{
+	int i;
+	uint16_t *_stream = (void*)stream;
+	int volume = 10; /* 10% level */
+
+	/* make some white noise ... */
+	for (i = 0; i < len; i += 4) {
+		signed short sample = ((rand() % 65536) - 32768) * volume / 100;
+		_stream[i] = sample; /* left */
+		_stream[i + 1] = sample; /* right */
+	}
+}
+
+void
+screen_fill(unsigned char ch, unsigned char fg, unsigned char bg)
+{
+	unsigned x, y;
+	struct screen_cell fill = { .fg = fg, .bg = bg, .ch = ch };
+
+	for (y = 0; y < SCREEN_H; y++) {
+		for (x = 0; x < SCREEN_W; x++) {
+			screen[y][x] = fill;
+		}
+	}
+}
 
 void
 rpg_fini(void)
 {
-	if (main_ctx)
-		SDL_GL_DeleteContext(main_ctx);
-	main_ctx = NULL;
-	if (main_win)
-		SDL_DestroyWindow(main_win);
-	main_win = NULL;
+	engine_audio_stop();
 
-	SDL_Quit();
+	/* disable and free our sprite sheet */
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDeleteTextures(1, &sheet_tex);
+
+	screen_fill('X', 7, 0);
 }
 
 int
 rpg_init(void)
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-		DBG_LOG("Failed to initialize SDL: %s", SDL_GetError());
+	/* load our sprite sheet */
+	glGenTextures(1, &sheet_tex);
+	glBindTexture(GL_TEXTURE_2D, sheet_tex);
+
+	if (engine_texture_loadfile("assets/sheet1.bmp")) {
+		DBG_LOG("Unable to load texture image");
 		return -1;
 	}
 
-	SDL_LogSetAllPriority(SDL_LOG_PRIORITY_WARN);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	fullscreen = false;
-
-	/* require OpenGL 3.2 */
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-	// SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
-	main_win = SDL_CreateWindow(RPG_WINDOW_TITLE,
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		RPG_OUT_WIDTH, RPG_OUT_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
-	if (!main_win) {
-		DBG_LOG("Failed to create window: %s", SDL_GetError());
-		goto fail;
-	}
-
-	main_ctx = SDL_GL_CreateContext(main_win);
-	if (!main_ctx) {
-		DBG_LOG("Failed to initialize GL context: %s", SDL_GetError());
-		goto fail;
-	}
-
-	DBG_LOG("Successfully initialized!");
+	/* audio setup */
+// DISABLED AUDIO:	engine_audio_start(rpg_playback, NULL);
 
 	return 0;
-fail:
-	rpg_fini();
-	return -1;
 }
 
+/* update the game state */
 void
 rpg_update(double elapsed)
 {
 	// TODO: update the scene
 }
 
-void
+/* paint the scene (with OpenGL). return zero on success */
+int
 rpg_paint(void)
 {
 	glClearColor(0.5, 0.5, 0.8, 1.0);
@@ -96,64 +122,7 @@ rpg_paint(void)
 
 	// TODO: render the scene
 
-	SDL_GL_SwapWindow(main_win);
-}
-
-void
-rpg_loop(void)
-{
-	SDL_Event e;
-	Uint64 prev, now, freq = SDL_GetPerformanceFrequency();
-
-	prev = SDL_GetPerformanceCounter();
-	while (1) {
-		now = SDL_GetPerformanceCounter();
-		rpg_update((double)(now - prev) / freq);
-		rpg_paint();
-
-		if (!SDL_WaitEvent(&e)) {
-			break;
-		}
-
-		// TODO: support more than just main_win
-
-		switch (e.type) {
-		case SDL_QUIT:
-			return; /* quit! */
-		case SDL_KEYDOWN:
-		case SDL_KEYUP:
-			switch (e.key.keysym.sym) {
-			case SDLK_ESCAPE:
-				// TODO: prompt before exiting
-				if (e.type == SDL_KEYDOWN)
-					return; /* quit! */
-				break;
-			case SDLK_F11: /* fullscreen */
-				if (e.type == SDL_KEYDOWN) {
-					fullscreen = !fullscreen;
-					if (fullscreen)
-						SDL_SetWindowFullscreen(main_win,
-								SDL_WINDOW_FULLSCREEN_DESKTOP);
-					else
-						SDL_SetWindowFullscreen(main_win, 0);
-				}
-				break;
-			case SDLK_LEFT:
-				DBG_LOG("TODO: SDLK_LEFT");
-				break;
-			case SDLK_RIGHT:
-				DBG_LOG("TODO: SDLK_RIGHT");
-				break;
-			case SDLK_UP:
-				DBG_LOG("TODO: SDLK_UP");
-				break;
-			case SDLK_DOWN:
-				DBG_LOG("TODO: SDLK_DOWN");
-				break;
-			}
-			break;
-		}
-	}
+	return 0;
 }
 
 int
@@ -167,19 +136,35 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 #endif
 	DBG_LOG("Starting up ...");
 
-	if (rpg_init()) {
-#ifndef NDEBUG
-		/* interactive prompts for errors */
-		DBG_LOG("An error occurred!");
-		printf("Press enter to proceed\n");
-		getchar();
-#endif
-		return 1;
+	if (engine_init()) {
+		goto failure;
 	}
 
-	rpg_loop();
+	if (rpg_init()) {
+		goto failure;
+	}
+
+	if (engine_loop()) {
+		DBG_LOG("loop function returned error");
+	}
 
 	rpg_fini();
 
+	engine_fini();
+
 	return 0;
+
+failure:
+#ifndef NDEBUG
+	/* interactive prompts for errors */
+	DBG_LOG("An error occurred!");
+	printf("Press enter to proceed\n");
+	getchar();
+#endif
+
+	rpg_fini();
+
+	engine_fini();
+
+	return 1;
 }
