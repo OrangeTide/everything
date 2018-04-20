@@ -3,6 +3,8 @@
 #include <stdbool.h>
 
 #include <SDL2/SDL.h>
+
+#include <GL/gl3w.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
 
@@ -19,6 +21,10 @@ static SDL_AudioDeviceID audio_device;
 static struct engine_key_state {
 	keystate *left, *right, *up, *down, *button_b, *button_a, *button_y, *button_x, *select, *start;
 } engine_key_state;
+
+/******************************************************************************/
+/* Initialization */
+/******************************************************************************/
 
 void
 engine_fini(void)
@@ -65,6 +71,8 @@ engine_init(void)
 		goto fail;
 	}
 
+	SDL_GL_MakeCurrent(main_win, main_ctx);
+
 	/* register published key events */
 	engine_key_state.left = keystate_register("left");
 	engine_key_state.right = keystate_register("right");
@@ -77,13 +85,59 @@ engine_init(void)
 	engine_key_state.start = keystate_register("start");
 	engine_key_state.select = keystate_register("select");
 
-	DBG_LOG("Successfully initialized!");
-
 	return 0;
 fail:
 	engine_fini();
 	return -1;
 }
+
+/******************************************************************************/
+/* Utilities & Helpers */
+/******************************************************************************/
+
+/* load a texture from a file to currently bound texture */
+int
+engine_texture_loadfile(const char *filename)
+{
+	SDL_Surface *surf;
+	GLint mode;
+
+	// TODO: support other file types ...
+	surf = SDL_LoadBMP(filename);
+	if (!surf) {
+		DBG_LOG("ERROR:%s:%s", filename, SDL_GetError());
+		return -1;
+	}
+
+	DBG_LOG("image %dx%d,%d\n", surf->w, surf->h, 8 * surf->format->BytesPerPixel);
+
+	switch (surf->format->BytesPerPixel) {
+	case 4:
+		mode = GL_RGBA;
+		break;
+	case 3:
+		mode = GL_RGB;
+		break;
+	case 1:
+		mode = GL_RED; /* one channel / intensity - shader will have to deal with palette */
+		break;
+	default:
+		DBG_LOG("ERROR:%s:unsupported image depth %d",
+			filename, surf->format->BytesPerPixel);
+		SDL_FreeSurface(surf);
+		return -1;
+	}
+
+	glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
+
+	SDL_FreeSurface(surf);
+
+	return 0;
+}
+
+/******************************************************************************/
+/* Events */
+/******************************************************************************/
 
 /* collects events in a loop and calls update and paint procedures.
  * return 0 on quit, non-zero on error.
@@ -94,14 +148,18 @@ engine_loop(void)
 	SDL_Event e;
 	Uint64 prev, now, freq = SDL_GetPerformanceFrequency();
 
+	DBG_LOG("%s():Loop start...", __func__);
+
 	prev = SDL_GetPerformanceCounter();
 	while (1) {
 		now = SDL_GetPerformanceCounter();
 		rpg_update((double)(now - prev) / freq);
+		DBG_LOG("%s():update complete", __func__);
 
 		if (rpg_paint()) {
 			break; /* unable to paint for some reason */
 		}
+		DBG_LOG("%s():paint complete", __func__);
 
 		SDL_GL_SwapWindow(main_win);
 
@@ -170,45 +228,9 @@ engine_loop(void)
 	return -1;
 }
 
-/* load a texture from a file to currently bound texture */
-int
-engine_texture_loadfile(const char *filename)
-{
-	SDL_Surface *surf;
-	GLint mode;
-
-	// TODO: support other file types ...
-	surf = SDL_LoadBMP(filename);
-	if (!surf) {
-		DBG_LOG("ERROR:%s:%s", filename, SDL_GetError());
-		return -1;
-	}
-
-	DBG_LOG("image %dx%d,%d\n", surf->w, surf->h, 8 * surf->format->BytesPerPixel);
-
-	switch (surf->format->BytesPerPixel) {
-	case 4:
-		mode = GL_RGBA;
-		break;
-	case 3:
-		mode = GL_RGB;
-		break;
-	case 1:
-		mode = GL_RED; /* one channel / intensity - shader will have to deal with palette */
-		break;
-	default:
-		DBG_LOG("ERROR:%s:unsupported image depth %d",
-			filename, surf->format->BytesPerPixel);
-		SDL_FreeSurface(surf);
-		return -1;
-	}
-
-	glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
-
-	SDL_FreeSurface(surf);
-
-	return 0;
-}
+/******************************************************************************/
+/* Audio */
+/******************************************************************************/
 
 #if 0 // TODO: implement this
 
