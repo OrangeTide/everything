@@ -11,7 +11,11 @@ glerr(const char *reason)
 
 	if (code == GL_NO_ERROR)
 		return;
+#if 0 // enable this once we start loading libglu
 	str = gluErrorString(code);
+#else
+	str = "(no glu)";
+#endif
 	if (!reason)
 		pr_err("GL error 0x%04x:%s", (unsigned)code, str);
 	else
@@ -33,12 +37,14 @@ print_shader_error(GLuint shader, const char *reason)
 static GLuint
 load_shader_from_string(GLenum type, const unsigned char *s)
 {
-	GLuint shader = glCreateShader(type);
+	GLuint shader;
 	GLint compile_status;
 	const GLchar *source[] = { (const GLchar*)s };
 
+	shader = glCreateShader(type);
 	if (!shader)
 		return 0;
+
 	glShaderSource(shader, 1, source, NULL);
 	glCompileShader(shader);
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
@@ -47,6 +53,7 @@ load_shader_from_string(GLenum type, const unsigned char *s)
 		glDeleteShader(shader);
 		return 0;
 	}
+
 	return shader;
 }
 #endif

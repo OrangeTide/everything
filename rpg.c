@@ -16,18 +16,29 @@
 #endif
 
 #include "jdm_embed.h"
+#define JDM_VECTORS_IMPLEMENTATION
+#include "jdm_vectors.h"
 
 #include "rpg.h"
 
+/* locations of shader parameters */
+static GLint vposition_loc;
+static GLint modelview_loc;
+static GLint projection_loc;
+
 /******************************************************************************/
-/* Debug functions */
+/* Debug print functions */
 /******************************************************************************/
 
 static void
 die(const char *msg)
 {
+#if defined(WIN32) /* Windows */
 	MessageBox(0, msg ? msg : "I can has error", "Error!", MB_ICONSTOP | MB_OK);
 	ExitProcess(1);
+#else
+	exit(1);
+#endif
 }
 
 static void
@@ -35,12 +46,15 @@ pr_err(const char *fmt, ...)
 {
 	char msg[256];
 	va_list ap;
+
 	va_start(ap, fmt);
 	strcpy(msg, "ERROR:");
 	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
 	va_end(ap);
 	puts(msg);
+#if defined(WIN32) /* Windows */
 	MessageBox(0, msg, "Error!", MB_ICONSTOP | MB_OK);
+#endif
 }
 
 static void
@@ -48,6 +62,7 @@ pr_info(const char *fmt, ...)
 {
 	char msg[256];
 	va_list ap;
+
 	va_start(ap, fmt);
 	strcpy(msg, "INFO:");
 	vsnprintf(msg + 5, sizeof(msg) - 5, fmt, ap);
@@ -189,6 +204,48 @@ screen_fill(unsigned char ch, unsigned char fg, unsigned char bg)
 	}
 }
 
+/* paint the scene (with OpenGL). return zero on success */
+int
+rpg_paint(void)
+{
+	GLfloat quad_vertex[][3] = {
+		{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f,  0.0f},
+		{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {-0.5f, 0.5f,  0.0f},
+	};
+	unsigned quad_elements = sizeof(quad_vertex) / sizeof(*quad_vertex);
+	GLfloat modelview[16], projection[16];
+
+	DBG_LOG("%s():Draw start...", __func__);
+
+	glClearColor(0.5, 0.5, 0.8, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	if (!sheet_tex)
+		return -1;
+
+	glBindTexture(GL_TEXTURE_2D, sheet_tex);
+
+	mat4_identity(modelview);
+	mat4_identity(projection);
+
+	glUniformMatrix4fv(modelview_loc, 1, GL_FALSE, modelview);
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, projection);
+
+	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, 0, quad_vertex);
+
+	glEnableVertexAttribArray(vposition_loc);
+	glDrawArrays(GL_TRIANGLES, 0, quad_elements);
+	glDisableVertexAttribArray(vposition_loc);
+
+	DBG_LOG("%s():Draw complete...", __func__);
+
+	return 0;
+}
+
+/******************************************************************************/
+/* Initialization */
+/******************************************************************************/
+
 void
 rpg_fini(void)
 {
@@ -198,12 +255,14 @@ rpg_fini(void)
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDeleteTextures(1, &sheet_tex);
 
-	screen_fill('X', 7, 0);
-}
+	/* free the shader program */
+	glUseProgram(0);
+	if (textmode_program)
+		glDeleteProgram(textmode_program);
+	textmode_program = 0;
 
-/******************************************************************************/
-/* Initialization */
-/******************************************************************************/
+	screen_fill('?', 0, 7); /* fill with junk */
+}
 
 int
 rpg_init(void)
@@ -228,8 +287,14 @@ rpg_init(void)
 
 	glUseProgram(textmode_program);
 
+	vposition_loc = glGetAttribLocation(textmode_program, "vPosition");
+	modelview_loc = glGetUniformLocation(textmode_program, "modelview");
+	projection_loc = glGetUniformLocation(textmode_program, "projection");
+
 	/* audio setup */
 // DISABLED AUDIO:	engine_audio_start(rpg_playback, NULL);
+
+	screen_fill('#', 7, 0); /* fill with a pattern */
 
 	return 0;
 }
@@ -238,19 +303,9 @@ rpg_init(void)
 void
 rpg_update(double elapsed)
 {
+	DBG_LOG("update %g seconds", elapsed);
+
 	// TODO: update the scene
-}
-
-/* paint the scene (with OpenGL). return zero on success */
-int
-rpg_paint(void)
-{
-	glClearColor(0.5, 0.5, 0.8, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	// TODO: render the scene
-
-	return 0;
 }
 
 int
@@ -264,13 +319,21 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 #endif
 	DBG_LOG("Starting up ...");
 
+	if (gl3wInit() != GL3W_OK) {
+		DBG_LOG("Error opening GL library");
+	}
+
 	if (engine_init()) {
 		goto failure;
 	}
 
+	DBG_LOG("Successfully initialized engine!");
+
 	if (rpg_init()) {
 		goto failure;
 	}
+
+	DBG_LOG("Successfully initialized game!");
 
 	if (engine_loop()) {
 		DBG_LOG("loop function returned error");
