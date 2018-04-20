@@ -100,15 +100,15 @@ define process-config
 $(info Processing configuration for $1 ...)
 $1.SRCS ?= $1.c
 $1.EXEC ?= $1$X
-$1.CFLAGS ?= $(CFLAGS) $(if $($1.PKGS),$(call pkg-config-cflags,$($1.PKGS)))
-$1.LDFLAGS ?= $(LDFLAGS) $(if $($1.PKGS),$(call pkg-config-libs,$($1.PKGS)))
+$1.CFLAGS ?= $(CFLAGS)
+$1.LDFLAGS ?= $(LDFLAGS)
 endef
 
 # generates rules for one target. currently does .c to executable without intermediate .o
 define gen-target
 $(info Generating rules for $1 ... $($1.EXEC) : $($1.SRCS))
 $($1.EXEC) : $($1.SRCS)
-	$(CC) -o $$@ $$^ $($1.CFLAGS) $($1.LDFLAGS)
+	$(CC) -o $$@ $$^ $($1.CFLAGS) $(if $($1.PKGS),$(call pkg-config-cflags,$($1.PKGS))) $($1.LDFLAGS) $(if $($1.PKGS),$(call pkg-config-libs,$($1.PKGS)))
 all :: $($1.EXEC)
 clean ::
 	$(RM) $$($1.EXEC) $$($1.OBJS)
