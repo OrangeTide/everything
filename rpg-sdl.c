@@ -6,12 +6,19 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
+#define KEYSTATE_IMPLEMENTATION
+#include "keystate.h"
+
 #include "rpg.h"
 
 static bool fullscreen = false;
 static SDL_Window *main_win;
 static SDL_GLContext main_ctx;
 static SDL_AudioDeviceID audio_device;
+
+static struct engine_key_state {
+	keystate *left, *right, *up, *down, *button_b, *button_a, *button_y, *button_x, *select, *start;
+} engine_key_state;
 
 void
 engine_fini(void)
@@ -59,6 +66,18 @@ engine_init(void)
 	}
 
 	DBG_LOG("Successfully initialized!");
+
+	/* register published key events */
+	engine_key_state.left = keystate_register("left");
+	engine_key_state.right = keystate_register("right");
+	engine_key_state.up = keystate_register("up");
+	engine_key_state.down = keystate_register("down");
+	engine_key_state.button_a = keystate_register("a");
+	engine_key_state.button_b = keystate_register("b");
+	engine_key_state.button_x = keystate_register("x");
+	engine_key_state.button_y = keystate_register("y");
+	engine_key_state.start = keystate_register("start");
+	engine_key_state.select = keystate_register("select");
 
 	return 0;
 fail:
@@ -113,17 +132,36 @@ engine_loop(void)
 						SDL_SetWindowFullscreen(main_win, 0);
 				}
 				break;
-			case SDLK_LEFT:
-				DBG_LOG("TODO: SDLK_LEFT");
+			case SDLK_LEFT: // TODO: support remapping
+				keystate_send(engine_key_state.left, e.type == SDL_KEYDOWN);
 				break;
-			case SDLK_RIGHT:
-				DBG_LOG("TODO: SDLK_RIGHT");
+			case SDLK_RIGHT: // TODO: support remapping
+				keystate_send(engine_key_state.right, e.type == SDL_KEYDOWN);
 				break;
-			case SDLK_UP:
-				DBG_LOG("TODO: SDLK_UP");
+			case SDLK_UP: // TODO: support remapping
+				keystate_send(engine_key_state.up, e.type == SDL_KEYDOWN);
 				break;
-			case SDLK_DOWN:
-				DBG_LOG("TODO: SDLK_DOWN");
+			case SDLK_DOWN: // TODO: support remapping
+				keystate_send(engine_key_state.down, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_z: // TODO: support remapping
+				keystate_send(engine_key_state.button_b, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_x: // TODO: support remapping
+				keystate_send(engine_key_state.button_a, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_a: // TODO: support remapping
+				keystate_send(engine_key_state.button_y, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_s: // TODO: support remapping
+				keystate_send(engine_key_state.button_x, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_RETURN: // TODO: support remapping
+				keystate_send(engine_key_state.start, e.type == SDL_KEYDOWN);
+				break;
+			case SDLK_LSHIFT: // TODO: support remapping
+			case SDLK_RSHIFT: // TODO: support remapping
+				keystate_send(engine_key_state.select, e.type == SDL_KEYDOWN);
 				break;
 			}
 			break;
