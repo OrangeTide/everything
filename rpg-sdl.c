@@ -65,8 +65,6 @@ engine_init(void)
 		goto fail;
 	}
 
-	DBG_LOG("Successfully initialized!");
-
 	/* register published key events */
 	engine_key_state.left = keystate_register("left");
 	engine_key_state.right = keystate_register("right");
@@ -78,6 +76,8 @@ engine_init(void)
 	engine_key_state.button_y = keystate_register("y");
 	engine_key_state.start = keystate_register("start");
 	engine_key_state.select = keystate_register("select");
+
+	DBG_LOG("Successfully initialized!");
 
 	return 0;
 fail:

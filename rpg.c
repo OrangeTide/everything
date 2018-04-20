@@ -3,15 +3,130 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include <GL/gl3w.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
+#include <GL/glu.h>
 
 #if defined(WIN32) /* Windows */
-#  define WIN32_LEAN_AND_MEAN
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
 #  include <windows.h>
 #endif
 
+#include "jdm_embed.h"
+
 #include "rpg.h"
+
+/******************************************************************************/
+/* Debug functions */
+/******************************************************************************/
+
+static void
+die(const char *msg)
+{
+	MessageBox(0, msg ? msg : "I can has error", "Error!", MB_ICONSTOP | MB_OK);
+	ExitProcess(1);
+}
+
+static void
+pr_err(const char *fmt, ...)
+{
+	char msg[256];
+	va_list ap;
+	va_start(ap, fmt);
+	strcpy(msg, "ERROR:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
+	va_end(ap);
+	puts(msg);
+	MessageBox(0, msg, "Error!", MB_ICONSTOP | MB_OK);
+}
+
+static void
+pr_info(const char *fmt, ...)
+{
+	char msg[256];
+	va_list ap;
+	va_start(ap, fmt);
+	strcpy(msg, "INFO:");
+	vsnprintf(msg + 5, sizeof(msg) - 5, fmt, ap);
+	va_end(ap);
+	puts(msg);
+}
+
+#if NDEBUG
+#define pr_dbg(...) do { /* nothing */ } while(0)
+#else
+static void
+pr_dbg(const char *fmt, ...)
+{
+	char msg[256];
+	va_list ap;
+	va_start(ap, fmt);
+	strcpy(msg, "DEBUG:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
+	va_end(ap);
+	puts(msg);
+}
+#endif
+
+/******************************************************************************/
+/* Shaders */
+/******************************************************************************/
+
+JDM_EMBED_FILE(textmode_fragment_source, "textmode.frag");
+JDM_EMBED_FILE(textmode_vertex_source, "textmode.vert");
+
+#define JDM_UTILGL_IMPLEMENTATION
+#include "jdm_utilgl.h"
+
+static GLuint
+textmode_shader_load(void)
+{
+	GLuint vertex_shader;
+	GLuint fragment_shader;
+	GLuint program;
+	GLint link_status;
+
+	vertex_shader = load_shader_from_string(GL_VERTEX_SHADER, textmode_vertex_source);
+	fragment_shader = load_shader_from_string(GL_FRAGMENT_SHADER, textmode_fragment_source);
+	if (!vertex_shader || !fragment_shader)
+		goto err_free_shaders;
+
+	program = glCreateProgram();
+	if (!program) {
+		glerr("glCreateProgram()");
+		goto err_free_shaders;
+	}
+
+	glAttachShader(program, vertex_shader);
+	glAttachShader(program, fragment_shader);
+
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &link_status);
+	if (!link_status) {
+		print_shader_error(program, "shader linking failed");
+		goto err_free_program;
+	}
+
+	return program;
+
+err_free_program:
+	glDeleteProgram(program);
+
+err_free_shaders:
+	if (vertex_shader)
+		glDeleteShader(vertex_shader);
+	if (fragment_shader)
+		glDeleteShader(fragment_shader);
+
+	return 0;
+}
+
+/******************************************************************************/
+/* Screen */
+/******************************************************************************/
 
 #define SCREEN_W 40
 #define SCREEN_H 30
@@ -24,6 +139,7 @@ struct screen_cell {
 
 static GLuint sheet_tex = 0;
 static struct screen_cell screen[SCREEN_H][SCREEN_W];
+static GLuint textmode_program;
 
 /* palette colors (Solarized Light) */
 struct { unsigned r:8, g:8, b:8; } palette[] = {
@@ -85,6 +201,10 @@ rpg_fini(void)
 	screen_fill('X', 7, 0);
 }
 
+/******************************************************************************/
+/* Initialization */
+/******************************************************************************/
+
 int
 rpg_init(void)
 {
@@ -99,6 +219,14 @@ rpg_init(void)
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	textmode_program = textmode_shader_load();
+	if (!textmode_program) {
+		DBG_LOG("Unable to load shader program");
+		return -1;
+	}
+
+	glUseProgram(textmode_program);
 
 	/* audio setup */
 // DISABLED AUDIO:	engine_audio_start(rpg_playback, NULL);
