@@ -19,7 +19,9 @@ static SDL_GLContext main_ctx;
 static SDL_AudioDeviceID audio_device;
 
 static struct engine_key_state {
-	keystate *left, *right, *up, *down, *button_b, *button_a, *button_y, *button_x, *select, *start;
+	keystate *left, *right, *up, *down,
+		*button_b, *button_a, *button_y, *button_x,
+		*select, *start;
 } engine_key_state;
 
 /******************************************************************************/
@@ -62,16 +64,28 @@ engine_init(void)
 		RPG_OUT_WIDTH, RPG_OUT_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
 	if (!main_win) {
 		DBG_LOG("Failed to create window: %s", SDL_GetError());
-		goto fail;
+		goto failure;
 	}
 
 	main_ctx = SDL_GL_CreateContext(main_win);
 	if (!main_ctx) {
 		DBG_LOG("Failed to initialize GL context: %s", SDL_GetError());
-		goto fail;
+		goto failure;
 	}
 
 	SDL_GL_MakeCurrent(main_win, main_ctx);
+
+	/* now that context is created we can initialize GL */
+	int res = gl3wInit();
+	if (res != GL3W_OK) {
+		DBG_LOG("Error opening GL library (%d)", res);
+		goto failure;
+	}
+
+	if (!gl3wIsSupported(3, 2)) {
+		DBG_LOG("Error OpenGL 3.2 or later required");
+		goto failure;
+	}
 
 	/* register published key events */
 	engine_key_state.left = keystate_register("left");
@@ -86,7 +100,7 @@ engine_init(void)
 	engine_key_state.select = keystate_register("select");
 
 	return 0;
-fail:
+failure:
 	engine_fini();
 	return -1;
 }

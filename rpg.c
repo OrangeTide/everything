@@ -1,4 +1,5 @@
 /* rpg.c : role playing game - public domain. */
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -267,6 +268,12 @@ rpg_fini(void)
 int
 rpg_init(void)
 {
+	assert(glCreateProgram != NULL);
+	assert(glGenTextures != NULL);
+	assert(glBindTextures != NULL);
+	assert(glTexParameteri != NULL);
+	assert(glTexImage2D != NULL);
+
 	/* load our sprite sheet */
 	glGenTextures(1, &sheet_tex);
 	glBindTexture(GL_TEXTURE_2D, sheet_tex);
@@ -318,10 +325,6 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 	freopen("CONOUT$", "w",stderr);
 #endif
 	DBG_LOG("Starting up ...");
-
-	if (gl3wInit() != GL3W_OK) {
-		DBG_LOG("Error opening GL library");
-	}
 
 	if (engine_init()) {
 		goto failure;
