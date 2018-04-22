@@ -2,6 +2,15 @@
 #ifndef JDM_UTILGL_H
 #define JDM_UTILGL_H
 
+/* Log any GL errors with function name and line number */
+#define log_gl_error() do { \
+	GLenum code = glGetError(); \
+	if (code) pr_info("%s():%d:GL error 0x%04x:%s", __func__, __LINE__, \
+		(unsigned)code, gluErrorString(code)); \
+	} while (0)
+
+// #define BUFFER_OFFSET(i) ((char *)0 + (i))
+
 #ifdef JDM_UTILGL_IMPLEMENTATION
 static void
 glerr(const char *reason)
@@ -11,7 +20,7 @@ glerr(const char *reason)
 
 	if (code == GL_NO_ERROR)
 		return;
-#if 0 // enable this once we start loading libglu
+#if 1 // enable this once we start loading libglu
 	str = gluErrorString(code);
 #else
 	str = "(no glu)";
