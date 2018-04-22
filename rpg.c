@@ -24,6 +24,8 @@
 
 /* locations of shader parameters */
 static GLint vposition_loc;
+static GLint texcoord_loc;
+static GLint texsampler_loc;
 static GLint modelview_loc;
 static GLint projection_loc;
 
@@ -209,14 +211,37 @@ screen_fill(unsigned char ch, unsigned char fg, unsigned char bg)
 int
 rpg_paint(void)
 {
-	GLfloat quad_vertex[][3] = {
-		{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f,  0.0f},
-		{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {-0.5f, 0.5f,  0.0f},
+	static GLuint vao, buffer;
+
+	GLfloat quad_vertex[][5] = {
+		/* Vertex[3], 				TexCoord[2] */
+		{ 0.0f, 0.8f, 0.0f,			0.5f, 1.0f, },
+		{ -0.8f, -0.8f, 0.0f,		0.0f, 0.0f, },
+		{ 0.8f, -0.8f, 0.0f,		1.0f, 0.0f, },
+		// TODO: implement the other half of the quad using triangles
 	};
+	unsigned quad_stride = sizeof(*quad_vertex);
 	unsigned quad_elements = sizeof(quad_vertex) / sizeof(*quad_vertex);
 	GLfloat modelview[16], projection[16];
 
-	DBG_LOG("%s():Draw start...", __func__);
+	if (!buffer) {
+		glGenBuffers(1, &buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, buffer);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex), quad_vertex,
+			GL_STATIC_DRAW);
+
+		DBG_LOG("%s():Initialized vertex buffer", __func__);
+	}
+	// TODO: also GL_ELEMENT_ARRAY_BUFFER
+
+	if (!vao) {
+		glGenVertexArrays(1, &vao);
+		glBindVertexArray(vao);
+		glBindBuffer(GL_ARRAY_BUFFER, buffer);
+	}
+
+
+//	DBG_LOG("%s():Draw start...", __func__);
 
 	glClearColor(0.5, 0.5, 0.8, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -224,7 +249,18 @@ rpg_paint(void)
 	if (!sheet_tex)
 		return -1;
 
+	/* Texturing */
+
+	log_gl_error();
+
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(texsampler_loc, 0); // GL_TEXTURE0
+
 	glBindTexture(GL_TEXTURE_2D, sheet_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	/* Projection */
 
 	mat4_identity(modelview);
 	mat4_identity(projection);
@@ -232,15 +268,42 @@ rpg_paint(void)
 	glUniformMatrix4fv(modelview_loc, 1, GL_FALSE, modelview);
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, projection);
 
-	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, 0, quad_vertex);
+	/* Drawing */
+
+	log_gl_error();
+
+	glBindVertexArray(vao);
+
+	// TODO: glEnableVertexAttribArray(vbuf);
+	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, quad_stride, (void*)0);
+	glVertexAttribPointer(texcoord_loc, 2, GL_FLOAT, GL_FALSE,  quad_stride, (void*)12);
+
+	log_gl_error();
 
 	glEnableVertexAttribArray(vposition_loc);
+	glEnableVertexAttribArray(texcoord_loc);
+
 	glDrawArrays(GL_TRIANGLES, 0, quad_elements);
+	// TODO: glDrawMultiArrays(...);
+	log_gl_error();
+
+	glDisableVertexAttribArray(texcoord_loc);
 	glDisableVertexAttribArray(vposition_loc);
 
-	DBG_LOG("%s():Draw complete...", __func__);
+//	DBG_LOG("%s():Draw complete...", __func__);
+
+	log_gl_error();
 
 	return 0;
+}
+
+/* update the game state */
+void
+rpg_update(double elapsed)
+{
+//	DBG_LOG("update %g seconds", elapsed);
+
+	// TODO: update the scene
 }
 
 /******************************************************************************/
@@ -254,7 +317,9 @@ rpg_fini(void)
 
 	/* disable and free our sprite sheet */
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glDeleteTextures(1, &sheet_tex);
+	if (sheet_tex)
+		glDeleteTextures(1, &sheet_tex);
+	sheet_tex = 0;
 
 	/* free the shader program */
 	glUseProgram(0);
@@ -295,8 +360,20 @@ rpg_init(void)
 	glUseProgram(textmode_program);
 
 	vposition_loc = glGetAttribLocation(textmode_program, "vPosition");
+	texcoord_loc = glGetAttribLocation(textmode_program, "texCoord");
+	texsampler_loc = glGetUniformLocation(textmode_program, "texsampler");
 	modelview_loc = glGetUniformLocation(textmode_program, "modelview");
 	projection_loc = glGetUniformLocation(textmode_program, "projection");
+
+	DBG_LOG("vposition_loc = %d", vposition_loc);
+	DBG_LOG("texcoord_loc = %d", texcoord_loc);
+	DBG_LOG("texsampler_loc = %d", texsampler_loc);
+	DBG_LOG("modelview_loc = %d", modelview_loc);
+	DBG_LOG("projection_loc = %d", projection_loc);
+
+	// glBindFragdataLocation(textmode_program, 0, "outcol");
+
+	log_gl_error();
 
 	/* audio setup */
 // DISABLED AUDIO:	engine_audio_start(rpg_playback, NULL);
@@ -304,15 +381,6 @@ rpg_init(void)
 	screen_fill('#', 7, 0); /* fill with a pattern */
 
 	return 0;
-}
-
-/* update the game state */
-void
-rpg_update(double elapsed)
-{
-	DBG_LOG("update %g seconds", elapsed);
-
-	// TODO: update the scene
 }
 
 int

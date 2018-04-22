@@ -168,12 +168,13 @@ engine_loop(void)
 	while (1) {
 		now = SDL_GetPerformanceCounter();
 		rpg_update((double)(now - prev) / freq);
-		DBG_LOG("%s():update complete", __func__);
+
+//		DBG_LOG("%s():update complete", __func__);
 
 		if (rpg_paint()) {
 			break; /* unable to paint for some reason */
 		}
-		DBG_LOG("%s():paint complete", __func__);
+//		DBG_LOG("%s():paint complete", __func__);
 
 		SDL_GL_SwapWindow(main_win);
 
