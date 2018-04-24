@@ -7,9 +7,16 @@
 #include <GL/gl3w.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
+#include <GL/glu.h>
 
 #define KEYSTATE_IMPLEMENTATION
 #include "keystate.h"
+
+#define JDM_DEBUGPR_IMPLEMENTATION
+#include "jdm_debugpr.h"
+
+#define JDM_UTILGL_IMPLEMENTATION
+#include "jdm_utilgl.h"
 
 #include "rpg.h"
 
@@ -114,7 +121,10 @@ int
 engine_texture_loadfile(const char *filename)
 {
 	SDL_Surface *surf;
-	GLint mode;
+	GLint format;
+	const GLint bgra_swizzle[] = {GL_BLUE, GL_GREEN, GL_RED, GL_ALPHA};
+	const GLint bgr_swizzle[] = {GL_BLUE, GL_GREEN, GL_RED, GL_ONE };
+	const GLint red_swizzle[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
 
 	// TODO: support other file types ...
 	surf = SDL_LoadBMP(filename);
@@ -123,17 +133,25 @@ engine_texture_loadfile(const char *filename)
 		return -1;
 	}
 
-	DBG_LOG("image %dx%d,%d\n", surf->w, surf->h, 8 * surf->format->BytesPerPixel);
+	DBG_LOG("image \"%s\" %dx%d,%d (pitch %d)", filename,
+		surf->w, surf->h, surf->format->BitsPerPixel, surf->pitch);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	switch (surf->format->BytesPerPixel) {
 	case 4:
-		mode = GL_RGBA;
+		format = GL_RGBA;
+		glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, bgra_swizzle);
 		break;
 	case 3:
-		mode = GL_RGB;
+		format = GL_RGB;
+		glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, bgr_swizzle);
 		break;
 	case 1:
-		mode = GL_RED; /* one channel / intensity - shader will have to deal with palette */
+	/* one channel / intensity - shader will have to deal with palette */
+		format = GL_RED;
+		glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, red_swizzle);
+		memset(surf->pixels, 255, surf->h * surf->pitch); // Hack in some pixels
 		break;
 	default:
 		DBG_LOG("ERROR:%s:unsupported image depth %d",
@@ -142,7 +160,11 @@ engine_texture_loadfile(const char *filename)
 		return -1;
 	}
 
-	glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surf->w, surf->h, 0, format,
+		GL_UNSIGNED_BYTE, surf->pixels);
+
+	log_gl_error();
 
 	SDL_FreeSurface(surf);
 

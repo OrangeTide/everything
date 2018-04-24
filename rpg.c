@@ -20,6 +20,10 @@
 #define JDM_VECTORS_IMPLEMENTATION
 #include "jdm_vectors.h"
 
+#include "jdm_debugpr.h"
+
+#include "jdm_utilgl.h"
+
 #include "rpg.h"
 
 /* locations of shader parameters */
@@ -29,65 +33,6 @@ static GLint texsampler_loc;
 static GLint modelview_loc;
 static GLint projection_loc;
 
-/******************************************************************************/
-/* Debug print functions */
-/******************************************************************************/
-
-static void
-die(const char *msg)
-{
-#if defined(WIN32) /* Windows */
-	MessageBox(0, msg ? msg : "I can has error", "Error!", MB_ICONSTOP | MB_OK);
-	ExitProcess(1);
-#else
-	exit(1);
-#endif
-}
-
-static void
-pr_err(const char *fmt, ...)
-{
-	char msg[256];
-	va_list ap;
-
-	va_start(ap, fmt);
-	strcpy(msg, "ERROR:");
-	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
-	va_end(ap);
-	puts(msg);
-#if defined(WIN32) /* Windows */
-	MessageBox(0, msg, "Error!", MB_ICONSTOP | MB_OK);
-#endif
-}
-
-static void
-pr_info(const char *fmt, ...)
-{
-	char msg[256];
-	va_list ap;
-
-	va_start(ap, fmt);
-	strcpy(msg, "INFO:");
-	vsnprintf(msg + 5, sizeof(msg) - 5, fmt, ap);
-	va_end(ap);
-	puts(msg);
-}
-
-#if NDEBUG
-#define pr_dbg(...) do { /* nothing */ } while(0)
-#else
-static void
-pr_dbg(const char *fmt, ...)
-{
-	char msg[256];
-	va_list ap;
-	va_start(ap, fmt);
-	strcpy(msg, "DEBUG:");
-	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
-	va_end(ap);
-	puts(msg);
-}
-#endif
 
 /******************************************************************************/
 /* Shaders */
@@ -95,9 +40,6 @@ pr_dbg(const char *fmt, ...)
 
 JDM_EMBED_FILE(textmode_fragment_source, "textmode.frag");
 JDM_EMBED_FILE(textmode_vertex_source, "textmode.vert");
-
-#define JDM_UTILGL_IMPLEMENTATION
-#include "jdm_utilgl.h"
 
 static GLuint
 textmode_shader_load(void)
@@ -246,6 +188,11 @@ rpg_paint(void)
 	glClearColor(0.5, 0.5, 0.8, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glUseProgram(textmode_program);
+
 	if (!sheet_tex)
 		return -1;
 
@@ -257,8 +204,6 @@ rpg_paint(void)
 	glUniform1i(texsampler_loc, 0); // GL_TEXTURE0
 
 	glBindTexture(GL_TEXTURE_2D, sheet_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	/* Projection */
 
@@ -275,8 +220,10 @@ rpg_paint(void)
 	glBindVertexArray(vao);
 
 	// TODO: glEnableVertexAttribArray(vbuf);
-	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, quad_stride, (void*)0);
-	glVertexAttribPointer(texcoord_loc, 2, GL_FLOAT, GL_FALSE,  quad_stride, (void*)12);
+	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE,
+		quad_stride, (void*)0);
+	glVertexAttribPointer(texcoord_loc, 2, GL_FLOAT, GL_FALSE,
+		quad_stride, (void*)12);
 
 	log_gl_error();
 
@@ -289,11 +236,12 @@ rpg_paint(void)
 
 	glDisableVertexAttribArray(texcoord_loc);
 	glDisableVertexAttribArray(vposition_loc);
-
-//	DBG_LOG("%s():Draw complete...", __func__);
+	glBindVertexArray(0);
+	glUseProgram(0);
 
 	log_gl_error();
 
+//	DBG_LOG("%s():Draw complete...", __func__);
 	return 0;
 }
 
@@ -343,13 +291,18 @@ rpg_init(void)
 	glGenTextures(1, &sheet_tex);
 	glBindTexture(GL_TEXTURE_2D, sheet_tex);
 
-	if (engine_texture_loadfile("assets/sheet1.bmp")) {
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	if (engine_texture_loadfile("assets/water.bmp" /* "assets/sheet1.bmp" */)) {
 		DBG_LOG("Unable to load texture image");
 		return -1;
 	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	textmode_program = textmode_shader_load();
 	if (!textmode_program) {

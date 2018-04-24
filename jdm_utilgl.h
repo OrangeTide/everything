@@ -11,8 +11,12 @@
 
 // #define BUFFER_OFFSET(i) ((char *)0 + (i))
 
+void glerr(const char *reason);
+void print_shader_error(GLuint shader, const char *reason);
+GLuint load_shader_from_string(GLenum type, const unsigned char *s);
+
 #ifdef JDM_UTILGL_IMPLEMENTATION
-static void
+void
 glerr(const char *reason)
 {
 	GLenum code = glGetError();
@@ -31,7 +35,7 @@ glerr(const char *reason)
 		pr_err("%s:GL error 0x%04x:%s", reason, (unsigned)code, str);
 }
 
-static void
+void
 print_shader_error(GLuint shader, const char *reason)
 {
 	GLint info_len = 0;
@@ -43,7 +47,7 @@ print_shader_error(GLuint shader, const char *reason)
 	pr_err("%s:%s", reason, info);
 }
 
-static GLuint
+GLuint
 load_shader_from_string(GLenum type, const unsigned char *s)
 {
 	GLuint shader;
