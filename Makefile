@@ -12,7 +12,7 @@ ifeq ($(OS),Windows_NT)
 	CFLAGS += -mwindows
 	pkg-config-cflags = $(foreach pkg,$(1),$$(PKGCFLAGS.$(pkg)))
 	pkg-config-libs = $(foreach pkg,$(1),$$(PKGLIBS.$(pkg)))
-	CFLAGS = -mwindows -Wall -W -Og -ggdb
+	CFLAGS = -mwindows -Wall -W -Os -ggdb
 ifeq ($(HOSTOS),Linux)
 	# based on my own cross-compile setup
 	WINDRES = x86_64-w64-mingw32-windres
@@ -36,7 +36,7 @@ else ifeq ($(OS),Linux)
 	pkg-config-libs = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGLIBS.$(pkg)),$$(shell pkg-config --libs $(pkg))))
 	CC = gcc
 	STRIP = strip
-	CFLAGS = -Wall -W -Og -ggdb
+	CFLAGS = -Wall -W -Os -ggdb
 #TODO: include packages from *.mkpkg files
 else
 	$(error Unsupported build environment)
