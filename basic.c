@@ -31,6 +31,10 @@ struct basic_env {
 	struct source_line *lines_head;
 	struct source_line *current_line; /* current program position */
 	int error; /* error flag */
+	int colpos; /* colunn position on terminal */
+	int screenwidth;
+	int tabsize;
+	char scratch[128]; /* scratch area for string constants */
 };
 
 /******************************************************************************/
@@ -141,25 +145,60 @@ line_insert(struct source_line **head, struct source_line *sl)
 enum keyword { K_PRINT, K_INPUT, K_IF, K_THEN, K_GOTO, K_FOR, K_NEXT, K_GOSUB,
 	K_RETURN, K_END, K_LET, };
 
-static int
-parse_keyword(const char *s, char **endptr)
-{
-	/* Format is: <length><string><length><string> ... NUL
-	 * must be in the same order as enum keyword */
-	const char kinfo[] = "5PRINT5INPUT2IF4THEN4GOTO3FOR4NEXT5GOSUB6RETURN3END3LET";
-	unsigned pos, len;
-	enum keyword keyword;
+enum function { F_ABS, F_ATN, F_COS, F_EXP, F_INT, F_LOG, F_RND, F_SGN, F_SIN,
+	F_SQR, F_TAN, F_FN0, F_FN1, F_FN2, F_FN3, F_FN4, F_FN5, F_FN6, F_FN7,
+	F_FN8, F_FN9 };
 
-	for (keyword = 0, pos = 0; kinfo[pos]; pos += len, keyword++) {
-		len = kinfo[pos++] - '0';
-		if (strncasecmp(s, kinfo + pos, len) == 0) {
+/* Format of info is: <length><string><length><string> ... NUL */
+static int
+generic_parser(const char *s, char **endptr, const char *info)
+{
+	unsigned pos, len;
+	unsigned n;
+
+	for (n = 0, pos = 0; info[pos]; pos += len, n++) {
+		len = info[pos++] - '0';
+		if (strncasecmp(s, info + pos, len) == 0) {
 			if (endptr)
 				*endptr = (char*)s + len;
-			return keyword;
+			return n;
 		}
 	}
 
-	return -1; /* no keyword match */
+	if (endptr)
+		*endptr = (char*)s;
+
+	return -1; /* no match */
+}
+
+/* parse for built-in keywords.
+ * return -1 on failure.
+ * returns enum keyword cast to int on success.
+ */
+static int
+parse_keyword(const char *s, char **endptr)
+{
+	/* must be in the same order as enum keyword */
+	const char keywords[] = "5PRINT5INPUT2IF4THEN4GOTO3FOR4NEXT5GOSUB6RETURN3END3LET";
+
+	return generic_parser(s, endptr, keywords);
+}
+
+/* parse for built-in functions.
+ * return -1 on failure.
+ * returns enum function cast to int on success.
+ */
+static int
+parse_function(const char *s, char **endptr)
+{
+	/* must be in the same order as enum keyword */
+	const char functions[] = "3ABS3ATN3COS3EXP3INT3LOG3RND3SGN3SIN3SQR3TAN";
+
+	/* check for FNx */
+	if (toupper(s[0]) == 'F' && toupper(s[1]) == 'N' && isdigit(s[2]))
+		return F_FN0 + s[2] - '0';
+
+	return generic_parser(s, endptr, functions);
 }
 
 /* evalutes numeric expression (floating point) */
@@ -168,13 +207,22 @@ eval_numeric_expression(const char *s, char **endptr, double *out)
 {
 	char *end;
 	double num;
+	const char *cur;
+
+	cur = s;
 
 	// TODO: implement an expression parser (recursive or shunting yard)
 
 	/* get a single number (floating point) */
+	while (isspace(*cur))
+		cur++;
+
 	errno = 0;
-	num = strtod(s, &end);
-	if (end == s || errno) {
+	num = strtod(cur, &end);
+	if (end == cur || errno) {
+		if (endptr)
+			*endptr = (char*)s;
+
 		return -1;
 	}
 
@@ -187,20 +235,64 @@ eval_numeric_expression(const char *s, char **endptr, double *out)
 }
 
 static int
-eval_string_expression(const char *s, char **endptr, char **out)
+eval_string_expression(const char *s, char **endptr, char *out, unsigned outmax)
 {
-	return -1; // TODO: implement this
+	const char *cur;
+	unsigned len;
+
+	cur = s;
+
+	while (isspace(*cur))
+		cur++;
+
+	if (*cur != '"')
+		goto failed_conversion;
+
+	cur++;
+	len = 0;
+	while (*cur != '"') {
+		if (!*cur)
+			goto failed_conversion;
+		if (out && len + 1 < outmax) {
+			out[len] = *cur;
+			out[len + 1] = 0;
+		}
+		len++;
+		cur++;
+	}
+
+	if (endptr)
+		*endptr = (char*)cur + 1;
+
+	return 0;
+failed_conversion:
+	if (endptr)
+		*endptr = (char*)s;
+
+	return -1;
+}
+
+/* check if printing another field will wrap the screen */
+static void
+check_colpos(struct basic_env *env, int cnt)
+{
+	if (cnt >= env->screenwidth)
+		return; /* ignore really long strings */
+	if (env->colpos + cnt > env->screenwidth) {
+		env->colpos = 0;
+		putchar('\n');
+	}
 }
 
 /* parse and execute a PRINT statement */
 static int
-exec_stmt_print(const char *args)
+exec_stmt_print(struct basic_env *env, const char *args)
 {
 	const char *cur;
 	char *end;
 	int result;
 	double num;
-	char *svalue;
+	int last_print_separator = 0;
 
 	cur = args;
 
@@ -211,11 +303,20 @@ exec_stmt_print(const char *args)
 	while (*cur) {
 		TRACE("running...");
 
+		last_print_separator = 0;
+
 		if (eval_numeric_expression(cur, &end, &num) == 0) {
-			// TODO: print a number
-			printf("%10g", num);
-		} else if (eval_string_expression(cur, &end, &svalue) == 0) {
-			// TODO: print a string
+			/* print a number */
+			check_colpos(env, 12); // TODO: calculate number's length
+			result = printf(" %.6g", num);
+			if (result > 0)
+				env->colpos += result;
+		} else if (eval_string_expression(cur, &end, env->scratch, sizeof(env->scratch)) == 0) {
+			/* print a string */
+			check_colpos(env, strlen(env->scratch));
+			result = printf("%s", env->scratch);
+			if (result > 0)
+				env->colpos += result;
 		} else {
 			return -1; /* failure */
 		}
@@ -227,13 +328,24 @@ exec_stmt_print(const char *args)
 			cur++;
 
 		if (*cur == ';') {
+			last_print_separator = 1;
+
 			cur++;
-			// TODO: handle ;
 		} else if (*cur == ',') {
+			int rem;
+
+			last_print_separator = 1;
+
 			cur++;
-			// TODO: handle ,
-		} else if (!*cur) {
-			break;
+
+			rem = env->colpos % env->tabsize;
+			if (rem) {
+				while (rem < env->tabsize)  {
+					rem++;
+					env->colpos++;
+					putchar(' ');
+				}
+			}
 		}
 
 		/* discard optional trailing spaces */
@@ -241,14 +353,17 @@ exec_stmt_print(const char *args)
 			cur++;
 	}
 
-	putchar('\n');
+	if (!last_print_separator) {
+		env->colpos = 0;
+		putchar('\n');
+	}
 
 	return 0;
 }
 
 /* parse and execute an INPUT statement */
 static int
-exec_stmt_input(const char *args)
+exec_stmt_input(struct basic_env *env, const char *args)
 {
 	// TODO: parse arguments for INPUT
 	printf("TODO: read input\n");
@@ -297,9 +412,9 @@ env_execute(struct basic_env *env, const char *line)
 
 	switch ((enum keyword)result) {
 	case K_PRINT:
-		return exec_stmt_print(end);
+		return exec_stmt_print(env, end);
 	case K_INPUT:
-		return exec_stmt_input(end);
+		return exec_stmt_input(env, end);
 	default:
 		return -1; /* unknown */
 	}
@@ -340,6 +455,10 @@ basic_new(void)
 	struct basic_env *env;
 
 	env = calloc(1, sizeof(*env));
+
+	env->screenwidth = 80; // TODO: auto-detect
+	env->tabsize = 12; /* big enough for: -1.234567e+89 */
+	env->colpos = 0;
 
 	return env;
 }
@@ -435,7 +554,9 @@ main(int argc, char **argv)
 	if (!env)
 		return 1; /* error */
 	// simplistic program
-	basic_line(env, "10 PRINT 1.2345; -3.21; +5e5");
+	basic_line(env, "10 PRINT \"===\",1,2,4,5");
+	basic_line(env, "20 PRINT 1234567;");
+	basic_line(env, "30 PRINT -3.21; +5e5  , \"Hello\" ");
 	// more advanced program
 	// basic_line(env, "20 PRINT \"What is your name?\"");
 	// basic_line(env, "30 INPUT A$");
