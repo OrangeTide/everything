@@ -69,5 +69,47 @@ load_shader_from_string(GLenum type, const unsigned char *s)
 
 	return shader;
 }
+
+static GLuint
+shader_load(const char *vertex_source, const char *fragment_source)
+{
+	GLuint vertex_shader;
+	GLuint fragment_shader;
+	GLuint program;
+	GLint link_status;
+
+	vertex_shader = load_shader_from_string(GL_VERTEX_SHADER, vertex_source);
+	fragment_shader = load_shader_from_string(GL_FRAGMENT_SHADER, fragment_source);
+	if (!vertex_shader || !fragment_shader)
+		goto err;
+	program = glCreateProgram();
+	if (!program) {
+		glerr("glCreateProgram()");
+		goto err_free_shaders;
+	}
+	glAttachShader(program, vertex_shader);
+	glAttachShader(program, fragment_shader);
+// #if USE_GLES2
+//	glBindAttribLocation(program, 0, "vPosition");
+//	glBindAttribLocation(program, 1, "vColor");
+// #endif
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &link_status);
+	if (!link_status) {
+		print_shader_error(program, "shader linking failed");
+		goto err_free_program;
+	}
+	glDeleteShader(vertex_shader);
+	glDeleteShader(fragment_shader);
+	return program;
+err_free_program:
+	glDeleteProgram(program);
+err_free_shaders:
+	glDeleteShader(vertex_shader);
+	glDeleteShader(fragment_shader);
+err:
+	return 0;
+}
+
 #endif
 #endif
