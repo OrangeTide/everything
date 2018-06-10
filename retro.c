@@ -1,5 +1,8 @@
+#define NDEBUG 1
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <math.h>
 
 #include <SDL.h>
 
@@ -72,8 +75,15 @@ do_event(SDL_Event *ev)
 		running = false;
 }
 
+static void
+do_paint(void)
+{
+	glClearColor(1.0, 1.0, 1.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
 int
-main()
+main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
 {
 	Uint32 start_time, end_time;
 	unsigned long frame_count;
@@ -86,7 +96,9 @@ main()
 
 	set_half_size(320, 480);
 
-	window = SDL_CreateWindow("Retro", 0, 0, width, height,
+	window = SDL_CreateWindow("Retro",
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		width, height,
 		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 
 	if (!window)
@@ -111,6 +123,8 @@ main()
 		while (SDL_PollEvent(&ev)) {
 			do_event(&ev);
 		}
+
+		do_paint();
 
 		SDL_GL_SwapWindow(window);
 		frame_count++;
