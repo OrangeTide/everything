@@ -96,7 +96,8 @@
 	"\t.align 4\n" \
 	"\t.globl\t" JDM_EMBED_ASM_SYM(identifier,) "_len\n" \
 	JDM_EMBED_ASM_SYM(identifier,_len) ":\n" \
-	"\t" JDM_EMBED_SIZE_TYPE_ASM "\t" JDM_EMBED_ASM_SYMLOCAL(identifier,) "_length"
+	"\t" JDM_EMBED_SIZE_TYPE_ASM "\t" JDM_EMBED_ASM_SYMLOCAL(identifier,) "_length" "\n" \
+	"\t" ".text"
 
 # define JDM_EMBED_FILE_DEFS(base_identifier) \
 	extern const unsigned char base_identifier[]; \

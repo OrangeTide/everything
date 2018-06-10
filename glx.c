@@ -2,20 +2,15 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#include <GL/glx.h>
+#include <X11/Xlib.h>
 
 #define USE_GLES2 0
 
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
-#include <GL/glu.h>
-#include <GL/glx.h>
-
-#include <X11/Xlib.h>
-#include <X11/extensions/Xrender.h>
-
-void game_initialize(void);
-void game_paint(void);
+#define _unused __attribute__((unused))
 
 static Display *dpy;
 static Atom wm_delete_window, wm_protocols;
@@ -23,32 +18,50 @@ static Window win;
 static GLXContext ctx;
 
 static void
-info(const char *fmt, ...)
+pr_info(const char *fmt, ...)
 {
 	va_list ap;
-	char buf[256];
+	char msg[256];
 
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	strcpy(msg, "INFO:");
+	vsnprintf(msg + 5, sizeof(msg) - 5, fmt, ap);
 	va_end(ap);
-	fputs("Info:", stderr);
-	fputs(buf, stderr);
-	fputc('\n', stderr);
+	strcat(msg, "\n");
+	fputs(msg, stderr);
 }
 
 static void
 pr_err(const char *fmt, ...)
 {
 	va_list ap;
-	char buf[256];
+	char msg[256];
 
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	strcpy(msg, "ERROR:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
 	va_end(ap);
-	fputs("Error:", stderr);
-	fputs(buf, stderr);
-	fputc('\n', stderr);
+	strcat(msg, "\n");
+	fputs(msg, stderr);
 }
+
+#if NDEBUG
+#define pr_dbg(...) do { /* nothing */ } while(0)
+#else
+static void
+pr_dbg(const char *fmt, ...) _unused;
+static void
+pr_dbg(const char *fmt, ...)
+{
+	char msg[256];
+	va_list ap;
+	va_start(ap, fmt);
+	strcpy(msg, "DEBUG:");
+	vsnprintf(msg + 6, sizeof(msg) - 6, fmt, ap);
+	va_end(ap);
+	puts(msg);
+}
+#endif
 
 static bool
 borisgl_initialize(int width, int height, const char *title)
@@ -58,7 +71,6 @@ borisgl_initialize(int width, int height, const char *title)
 	XVisualInfo *xvi;
 	int fbcount;
 	GLXFBConfig *fbconfiglist, fbconfig;
-	XRenderPictFormat *pict;
 	int i;
 	const int glx_attribs[] = {
 		GLX_X_RENDERABLE, True,
@@ -103,13 +115,8 @@ borisgl_initialize(int width, int height, const char *title)
 		xvi = glXGetVisualFromFBConfig(dpy, fbconfiglist[i]);
 		if (!xvi)
 			continue;
-		pict = XRenderFindVisualFormat(dpy, xvi->visual);
-		if (!pict)
-			continue;
-		if (pict->direct.alphaMask > 0) {
-			fbconfig = fbconfiglist[i];
-			goto found_fbconfig;
-		}
+		fbconfig = fbconfiglist[i];
+		goto found_fbconfig;
 	}
 	pr_err("No valid FB configurations");
 	return 1;
@@ -123,7 +130,10 @@ found_fbconfig:
 	wattr.border_pixel = 0;
 	wattr.colormap = XCreateColormap(dpy, root, xvi->visual, AllocNone);
 
-	win = XCreateWindow (dpy, root, 0, 0, width, height, 0, xvi->depth, InputOutput, xvi->visual, CWBackPixmap | CWBorderPixel | CWColormap | CWEventMask, &wattr);
+	win = XCreateWindow(dpy, root,
+			(DisplayWidth(dpy, screen) - width) / 2, (DisplayHeight(dpy, screen) - height) / 2,
+			width, height, 0, xvi->depth, InputOutput, xvi->visual,
+			CWBackPixmap | CWBorderPixel | CWColormap | CWEventMask, &wattr);
 
 	if (!win) {
 		pr_err("Unable to create window");
@@ -182,8 +192,8 @@ found_fbconfig:
 	XSync(dpy, False);
 	glXMakeCurrent(dpy, win, ctx);
 
-	info("GL_VERSION=%s", glGetString(GL_VERSION));
-	info("GL_RENDERER=%s", glGetString(GL_RENDERER));
+	pr_info("GL_VERSION=%s", glGetString(GL_VERSION));
+	pr_info("GL_RENDERER=%s", glGetString(GL_RENDERER));
 #if 0 // not supported/broken on one of my systems
 	GLint gl_major = 0, gl_minor = 0;
 	glGetIntegerv(GL_MAJOR_VERSION, &gl_major);
@@ -239,7 +249,6 @@ borisgl_loop(void)
 				break;
 			}
 		}
-		nanosleep(1000000);
 	}
 }
 
@@ -262,7 +271,7 @@ borisgl_cleanup(void)
 }
 
 int
-main(int argc, char **argv)
+main()
 {
 	if (!borisgl_initialize(640, 480, "game"))
 		return 1;
@@ -273,7 +282,3 @@ main(int argc, char **argv)
 
 	return 0;
 }
-
-/****************************************************************************/
-
-#include "tridemo.c"

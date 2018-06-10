@@ -22,7 +22,7 @@ Linux:
 
 To build Windows/wine from Linux:
 ```
-make OS=Windows_NT CC=x86_64-w64-mingw32-gcc
+make OS=Windows_NT RM=rm CC=x86_64-w64-mingw32-gcc
 ```
 
 ## Running the Tests
@@ -47,6 +47,7 @@ Contains software from multiple Public Domain sources.
 
 ## License
 
+![CC0 Public Domain](cc-zero.png)
 ```
 ------------------------------------------------------------------------------
 This software is available under 2 licenses -- choose whichever you prefer.
@@ -77,6 +78,7 @@ For full legal text see
 	https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt
 -----------------------------------------------------------------------------
 ```
+![CC0 Public Domain](cc0.png)
 
 ## Acknowledgments
 
