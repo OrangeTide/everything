@@ -47,6 +47,7 @@ Contains software from multiple Public Domain sources.
 
 ## License
 
+![CC0 Public Domain](cc-zero.png)
 ```
 ------------------------------------------------------------------------------
 This software is available under 2 licenses -- choose whichever you prefer.
