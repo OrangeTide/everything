@@ -27,8 +27,8 @@
 	_proc; })
 #  endif
 /** WGL function pointers **/
-static PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
-static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
+static PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB __attribute__((unused));
+static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB __attribute__((unused));
 #elif defined(__unix)
 #  include <GL/glx.h>
 #  define load_proc(name) (void*)glXGetProcAddress((const GLubyte*)(name))
@@ -42,7 +42,7 @@ static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 	static inline void func params __attribute__((unused)); \
 	static inline void func params { \
 		if (!_gldispatch_ ## func) \
-			_gldispatch_ ## func = load_proc(#func); \
+			_gldispatch_ ## func = (type)load_proc(#func); \
 		_gldispatch_ ## func args; \
 	}
 /* generates dispatch stub */
@@ -51,7 +51,7 @@ static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 	static inline ret func params __attribute__((unused)); \
 	static inline ret func params {	\
 		if (!_gldispatch_ ## func) \
-			_gldispatch_ ## func = load_proc(#func); \
+			_gldispatch_ ## func = (type)load_proc(#func); \
 		return _gldispatch_ ## func args; \
 	}
 /* use this for old 1.1 APIs that opengl32.dll would already have */
