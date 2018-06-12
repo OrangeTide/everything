@@ -80,6 +80,9 @@ else ifeq ($(OS),Linux)
 	# Libraries for math
 	PKGLIBS.m = -lm
 	PKGCFLAGS.m =
+	# glu
+	PKGCFLAGS.glu32 =
+	PKGLIBS.glu32 = -lglu
 endif
 
 # include all targets

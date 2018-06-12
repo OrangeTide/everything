@@ -47,13 +47,16 @@ resize_max(SDL_Window *window, int min_w, int min_h)
 
 	SDL_GetCurrentDisplayMode(0, &dm);
 
+#if 0
 	SDL_GetWindowBordersSize(window, &top, &left, &bottom, &right);
 
 	adj_w = left + right;
 	adj_h = top + bottom;
 
 	set_size(min_w, min_h, dm.w - adj_w, dm.h - adj_h);
-
+#else
+	set_size(min_w, min_h, dm.w - 32, dm.h - 32);
+#endif
 	SDL_SetWindowSize(window, width, height);
 	SDL_GetWindowSize(window, &w, &h);
 	width = w;
