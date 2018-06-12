@@ -79,7 +79,7 @@ else ifeq ($(OS),Linux)
 	PKGCFLAGS.m =
 	# glu
 	PKGCFLAGS.glu32 =
-	PKGLIBS.glu32 = -lglu
+	PKGLIBS.glu32 = -lGLU
 endif
 
 # include all targets
