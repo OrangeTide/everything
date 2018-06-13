@@ -7,12 +7,70 @@
 #include <SDL.h>
 
 #include "jdm_glload.h"
+#include "jdm_embed.h"
+
+#define JDM_DEBUGPR_IMPLEMENTATION
+#include "jdm_debugpr.h"
+
+#define JDM_UTILGL_IMPLEMENTATION
 #include "jdm_utilgl.h"
+
+#define JDM_VECTORS_IMPLEMENTATION
+#include "jdm_vectors.h"
+
+#define USE_GLES2 1
+
+#if USE_GLES2
+JDM_EMBED_FILE(fragment_source, "flat-es2.frag");
+JDM_EMBED_FILE(vertex_source, "flat-es2.vert");
+#else
+JDM_EMBED_FILE(fragment_source, "flat.frag");
+JDM_EMBED_FILE(vertex_source, "flat.vert");
+#endif
+
+/**************************************************************************/
 
 static SDL_Window *window;
 static SDL_GLContext context;
 static int width, height;
 static bool running;
+
+static GLuint my_shader_program;
+
+static GLint vposition_loc;
+static GLint vcolor_loc;
+static GLint vnormal_loc;
+static GLint modelview_loc;
+static GLint proj_loc;
+
+static GLfloat z_tick = 1.0f, z_rate = 0.05f, a_tick = 0.0f, a_rate = 0.02f;
+
+static GLfloat cube_vertex[][3] = {
+	{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f,  0.0f},
+	{0.5f,  0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {-0.5f, 0.5f,  0.0f},
+};
+
+static GLfloat cubecolor[][3] = {
+	{0.0f, 0.0f, 1.0f},
+	{1.0f, 0.0f, 0.0f},
+	{0.0f, 1.0f, 0.0f},
+	{0.0f, 0.0f, 1.0f},
+	{1.0f, 0.0f, 0.0f},
+	{0.8f, 0.8f, 0.8f},
+};
+
+static GLfloat cube_normal[][3] = {
+	{0.0f, 0.0f, -1.0f},
+	{0.0f, 0.0f, -1.0f},
+	{0.0f, 0.0f, -1.0f},
+	{0.0f, 0.0f, -1.0f},
+	{0.0f, 0.0f, -1.0f},
+	{0.0f, 0.0f, -1.0f},
+};
+
+static unsigned mesh_elements = sizeof(cube_vertex) / sizeof(*cube_vertex);
+
+/**************************************************************************/
 
 static void
 set_size(int min_w, int min_h, int max_w, int max_h)
@@ -72,6 +130,14 @@ set_gl(int maj, int min)
 }
 
 static void
+set_gles(void)
+{
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+}
+
+static void
 do_event(SDL_Event *ev)
 {
 	if (ev->type == SDL_WINDOWEVENT && ev->window.event == SDL_WINDOWEVENT_CLOSE)
@@ -81,8 +147,74 @@ do_event(SDL_Event *ev)
 static void
 do_paint(void)
 {
+	glUseProgram(my_shader_program);
+
+	GLfloat modelview[16], tmp[16], proj[16];
+
+	mat4_rotate(modelview, a_tick, vec3_new(0.0f, 0.0f, 1.0f));
+	mat4_translate(tmp, vec3_new(0.0f, 0.0f, -0.5f - z_tick));
+	mat4_mul(modelview, tmp);
+
+	mat4_perspective(proj, 90.0f, 0.75f, 0.05f, 400.0f);
+
+	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE, 0, cube_vertex);
+	glEnableVertexAttribArray(vposition_loc);
+
+	if (vcolor_loc >= 0) {
+		glVertexAttribPointer(vcolor_loc, 3, GL_FLOAT, GL_FALSE, 0, cubecolor);
+		glEnableVertexAttribArray(vcolor_loc);
+	}
+
+	if (vnormal_loc >= 0) {
+		glVertexAttribPointer(vnormal_loc, 3, GL_FLOAT, GL_FALSE, 0, cube_normal);
+		glEnableVertexAttribArray(vnormal_loc);
+	}
+
+	glDrawArrays(GL_TRIANGLES, 0, mesh_elements);
+
+	glDisableVertexAttribArray(vposition_loc);
+	if (vcolor_loc >= 0)
+		glDisableVertexAttribArray(vcolor_loc);
+	if (vnormal_loc >= 0)
+		glDisableVertexAttribArray(vnormal_loc);
+
+	/******/
+
 	glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+
+}
+
+static int 
+init_gl(void)
+{
+	my_shader_program = shader_load(vertex_source, fragment_source);
+	if (!my_shader_program)
+		return -1;
+
+	vposition_loc = glGetAttribLocation(my_shader_program, "vPosition");
+	vcolor_loc = glGetAttribLocation(my_shader_program, "vColor");
+	vnormal_loc = glGetAttribLocation(my_shader_program, "vNormal");
+	modelview_loc = glGetUniformLocation(my_shader_program, "modelview");
+	proj_loc = glGetUniformLocation(my_shader_program, "projection");
+
+	if (modelview_loc < 0 || proj_loc < 0 || vposition_loc < 0) {
+		return -1;
+	}
+	return 0;
+}
+
+static void
+clean_gl(void)
+{
+	if (my_shader_program)
+		glDeleteProgram(my_shader_program);
+}
+
+static void
+clean_all(void)
+{
 }
 
 int
@@ -95,7 +227,11 @@ main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 		return 1;
 
+#if USE_GLES2
+	set_gles();
+#else
 	set_gl(3, 3);
+#endif
 
 	set_half_size(320, 480);
 
@@ -113,6 +249,11 @@ main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
 
 	if (!context)
 		goto failure;
+
+	if (init_gl()) {
+		pr_err("initialization error with GL");
+		goto failure;
+	}
 
 	SDL_GL_SetSwapInterval(2); // 30 FPS
 
@@ -138,8 +279,16 @@ main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
 	printf("time: %g\nframes: %lu\nfps: %g\n",
 		frame_time, frame_count, frame_time ? frame_count / frame_time : HUGE_VAL);
 
+	clean_gl();
+	if (context)
+		SDL_GL_DeleteContext(context);
+	if (window)
+		SDL_DestroyWindow(window);
+	SDL_Quit();
+
 	return 0;
 failure:
+	clean_gl();
 	if (context)
 		SDL_GL_DeleteContext(context);
 	if (window)
