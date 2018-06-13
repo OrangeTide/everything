@@ -50,8 +50,8 @@ ifeq ($(OS),Windows_NT)
 	PKGCFLAGS.opengl32 =
 	PKGLIBS.opengl32 = -lopengl32
 	# glu
-	PKGCFLAGS.glu32 =
-	PKGLIBS.glu32 = -lglu32
+	PKGCFLAGS.glu =
+	PKGLIBS.glu = -lglu32
 	# gl - an alias for what we typically consider OpenGL
 	PKGCFLAGS.gl = $(PKGCFLAGS.opengl32) $(PKGCFLAGS.glu32)
 	PKGLIBS.gl = $(PKGLIBS.opengl32) $(PKGLIBS.glu32)
@@ -78,8 +78,8 @@ else ifeq ($(OS),Linux)
 	PKGLIBS.m = -lm
 	PKGCFLAGS.m =
 	# glu
-	PKGCFLAGS.glu32 =
-	PKGLIBS.glu32 = -lGLU
+	PKGCFLAGS.glu =
+	PKGLIBS.glu = -lGLU
 endif
 
 # include all targets

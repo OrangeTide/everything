@@ -3,7 +3,7 @@
 precision mediump float;
 precision mediump int;
 
-attribute vec4 vPosition;
+attribute vec3 vPosition;
 attribute vec3 vColor;
 attribute vec3 vNormal;
 

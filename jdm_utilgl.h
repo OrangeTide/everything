@@ -2,6 +2,8 @@
 #ifndef JDM_UTILGL_H
 #define JDM_UTILGL_H
 
+#include <GL/glu.h>
+
 /* Log any GL errors with function name and line number */
 #define log_gl_error() do { \
 	GLenum code = glGetError(); \
