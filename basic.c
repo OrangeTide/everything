@@ -7,6 +7,357 @@
 #include <errno.h>
 #include <ctype.h>
 
+/******************************************************************************/
+/* Public Data-types */
+/******************************************************************************/
+
+#define LABELS_MAX 2000
+
+typedef struct basic_environment basic_env_t;
+
+/******************************************************************************/
+/* Internal Data-types */
+/******************************************************************************/
+
+enum commands {
+	CMD_PRINT, CMD_INPUT, CMD_IF, CMD_THEN, CMD_GOTO, CMD_FOR, CMD_TO,
+	CMD_NEXT, CMD_GOSUB, CMD_RETURN, CMD_END, CMD_LET,
+};
+
+enum functions { FUN_ABS, FUN_ATN, FUN_COS, FUN_EXP, FUN_INT, FUN_LOG, FUN_RND,
+	FUN_SGN, FUN_SIN, FUN_SQR, FUN_TAN, FUN_FN0, FUN_FN1, FUN_FN2, FUN_FN3,
+	FUN_FN4, FUN_FN5, FUN_FN6, FUN_FN7, FUN_FN8, FUN_FN9
+};
+
+enum tokens {
+	TOK_COMMAND, TOK_EOL, TOK_FINISHED, TOK_NUMBER, TOK_VARIABLE, TOK_STRING,
+};
+
+struct basic_environment {
+	/* run state */
+	double var[26];
+	unsigned label_len;
+	struct label_entry {
+		unsigned linenum;
+		unsigned ofs;
+	} label_table[LABELS_MAX];
+	unsigned current_line;
+	/* source code */
+	char *source;
+	size_t source_len, source_max;
+	/* parse state */
+	enum tokens token_type;
+	union {
+		char token[80]; /* number, string, identifier, ... */
+		enum commands cmd;
+		enum functions fun;
+	} token;
+//	unsigned line_num;
+};
+
+/******************************************************************************/
+/* Internal functions */
+/******************************************************************************/
+
+/* appends a string to a buffer, growing allocation.
+ * returns offset of original string on success, -1 on error */
+static int
+append(const char *data, size_t data_len, char **base, size_t *len, size_t *max)
+{
+	size_t n = *len;
+	size_t m = *max;
+
+	if (n + data_len + 1 >= m) {
+		if (!m)
+			m = 16;
+		else
+			m *= 2;
+		char *new = realloc(*base, m);
+		if (!new)
+			return -1;
+		*base = new;
+		*max = m;
+	}
+
+	char *p = *base + n;
+	memcpy(p, data, data_len);
+	p[data_len] = 0;
+	*len = n + data_len + 1;
+
+	return n;
+}
+
+static int
+line_add(basic_env_t *env, const char *line, unsigned linenum)
+{
+	int ofs;
+	ofs = append(line, strlen(line), &env->source, &env->source_len,
+		     &env->source_max);
+	if (ofs < 0)
+		return -1; /* could not add */
+
+	struct label_entry *ent = &env->label_table[env->label_len++];
+	ent->linenum = linenum;
+	ent->ofs = ofs;
+
+	return 0;
+}
+
+static int
+line_rewind(basic_env_t *env)
+{
+	if (!env->label_len)
+		return -1;
+	env->current_line = 0;
+	return 0;
+}
+
+static const char *
+line_next(basic_env_t *env)
+{
+	if (env->current_line >= env->label_len)
+		return NULL;
+	unsigned i = env->current_line++;
+	return env->source + env->label_table[i].ofs;
+}
+
+/* look up matching label in label_table. returns slot in table */
+static int
+lookup(basic_env_t *env, unsigned linenum)
+{
+	unsigned i, max = env->label_len;
+	for (i = 0; i < max; i++) {
+		if (env->label_table[i].linenum == linenum)
+			return i;
+	}
+	return -1;
+}
+
+/* Format of info is: <length><string><length><string> ... NUL */
+static int
+generic_parser(const char *s, char **endptr, const char *info)
+{
+	unsigned pos, len;
+	unsigned n;
+
+	for (n = 0, pos = 0; info[pos]; pos += len, n++) {
+		len = info[pos++] - '0';
+		if (strncasecmp(s, info + pos, len) == 0) {
+			if (endptr)
+				*endptr = (char*)s + len;
+			return n;
+		}
+	}
+
+	if (endptr)
+		*endptr = (char*)s;
+
+	return -1; /* no match */
+}
+
+/* parse for built-in keywords.
+ * return -1 on failure.
+ * returns enum keyword cast to int on success.
+ */
+static int
+parse_keyword(const char *s, char **endptr)
+{
+	/* must be in the same order as enum keyword */
+	const char keywords[] = "5PRINT5INPUT2IF4THEN4GOTO3FOR2TO4NEXT5GOSUB6RETURN3END3LET";
+
+	return generic_parser(s, endptr, keywords);
+}
+
+/* parse for built-in functions.
+ * return -1 on failure.
+ * returns enum function cast to int on success.
+ */
+static int
+parse_function(const char *s, char **endptr)
+{
+	/* must be in the same order as enum keyword */
+	const char functions[] = "3ABS3ATN3COS3EXP3INT3LOG3RND3SGN3SIN3SQR3TAN";
+
+	/* check for FNx */
+	if (toupper(s[0]) == 'F' && toupper(s[1]) == 'N' && isdigit(s[2]))
+		return FUN_FN0 + s[2] - '0';
+
+	return generic_parser(s, endptr, functions);
+}
+
+static int
+execute(basic_env_t *env, const char *line)
+{
+	fprintf(stderr, "TODO: %s\n", line);
+	// TODO: implement this
+	return -1;
+}
+
+static int
+parse_line(basic_env_t *env, const char *line)
+{
+	char *end;
+	int linenum;
+
+	errno = 0;
+	linenum = strtoul(line, &end, 10);
+	if (end != line) {
+		/* add line */
+		while (isspace(*end))
+			end++;
+		line = end;
+
+		return line_add(env, line, linenum);
+	} else {
+		/* interpret immediately */
+		fprintf(stderr, "TRACE:%s():%d\n", __func__, __LINE__);
+
+		return execute(env, line);
+	}
+}
+
+/******************************************************************************/
+/* Top-level API */
+/******************************************************************************/
+
+void
+basic_free(basic_env_t *env)
+{
+	// TODO: implement this
+	free(env);
+}
+
+int
+basic_run(basic_env_t *env)
+{
+	const char *line;
+
+	line_rewind(env);
+
+	while ((line = line_next(env))) {
+		if (execute(env, line))
+			return -1;
+	}
+
+	return 0;
+}
+
+// TODO: replace this with a line-at-a-time version
+int
+basic_load(basic_env_t *env, const char *prog)
+{
+	const char *cur, *end;
+
+	/* decompose giant string into lines.
+	 * TODO: handle CR/LF.
+	 */
+	for (cur = prog; *cur; cur = end) {
+		end = strchr(cur, '\n');
+		if (!end)
+			end = cur + strlen(cur) - 1;
+		int len = end - cur;
+		end++;
+		char line[len + 1];
+		memcpy(line, cur, len);
+		line[len] = 0;
+		if (parse_line(env, line))
+			return -1;
+	}
+
+	return 0; /* success */
+}
+
+int
+basic_init(basic_env_t **env_out)
+{
+	if (!env_out)
+		return -1;
+	basic_env_t *env = calloc(1, sizeof(*env));
+	if (!env)
+		return -1;
+	*env_out = env;
+	return 0;
+}
+
+// TODO: basic_step()
+
+/******************************************************************************/
+/* Main */
+/******************************************************************************/
+
+static int
+loadfile(const char *filename, char **buf_out, size_t *len_out)
+{
+	FILE *f = fopen(filename, "r");
+	if (!f) {
+		perror(filename);
+		return -1;
+	}
+	fseek(f, 0L, SEEK_END);
+	long n = ftell(f);
+	rewind(f);
+
+	char *b = malloc(n + 1);
+	if ((long)fread(b, 1, n, f) != n) {
+		perror(filename);
+		free(b);
+		fclose(f);
+		return -1;
+	}
+	fclose(f);
+
+	if (buf_out) {
+		*buf_out = b;
+	} else {
+		free(b);
+	}
+
+	if (len_out)
+		*len_out = n;
+
+	return 0;
+}
+
+/* simple program that accepts a list of file(s) to execute */
+int
+main(int argc, char **argv)
+{
+	if (argc <= 1) {
+		fprintf(stderr, "usage: %s [programs...]\n", argv[0]);
+		// TODO: implement an interactive mode
+		return 1;
+	}
+
+	int i;
+	for (i = 1; i < argc; i++) {
+		char *prog;
+		int status;
+		const char *fn = argv[i];
+		basic_env_t *env;
+
+		basic_init(&env);
+		if (loadfile(fn, &prog, NULL)) {
+			fprintf(stderr, "%s:unable to open file\n", fn);
+			return 1;
+		}
+		status = basic_load(env, prog);
+		free(prog);
+		if (status) {
+			fprintf(stderr, "%s:unable to parse file\n", fn);
+			return 1;
+		}
+		status = basic_run(env);
+		basic_free(env);
+		if (status) {
+			fprintf(stderr, "%s:terminated unsuccessfully\n", fn);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+#if 0
 #define TRACE(m, ...) fprintf(stderr, "%s():%d:" m "\n", __func__, __LINE__, ## __VA_ARGS__)
 
 /******************************************************************************/
@@ -142,64 +493,64 @@ line_insert(struct source_line **head, struct source_line *sl)
 /* Internal functions - parser */
 /******************************************************************************/
 
-enum keyword { K_PRINT, K_INPUT, K_IF, K_THEN, K_GOTO, K_FOR, K_NEXT, K_GOSUB,
-	K_RETURN, K_END, K_LET, };
+/// enum keyword { K_PRINT, K_INPUT, K_IF, K_THEN, K_GOTO, K_FOR, K_NEXT, K_GOSUB,
+///	K_RETURN, K_END, K_LET, };
 
-enum function { F_ABS, F_ATN, F_COS, F_EXP, F_INT, F_LOG, F_RND, F_SGN, F_SIN,
-	F_SQR, F_TAN, F_FN0, F_FN1, F_FN2, F_FN3, F_FN4, F_FN5, F_FN6, F_FN7,
-	F_FN8, F_FN9 };
+/// enum function { F_ABS, F_ATN, F_COS, F_EXP, F_INT, F_LOG, F_RND, F_SGN, F_SIN,
+///	F_SQR, F_TAN, F_FN0, F_FN1, F_FN2, F_FN3, F_FN4, F_FN5, F_FN6, F_FN7,
+///	F_FN8, F_FN9 };
 
-/* Format of info is: <length><string><length><string> ... NUL */
-static int
-generic_parser(const char *s, char **endptr, const char *info)
-{
-	unsigned pos, len;
-	unsigned n;
+/// /* Format of info is: <length><string><length><string> ... NUL */
+/// static int
+/// generic_parser(const char *s, char **endptr, const char *info)
+/// {
+///	unsigned pos, len;
+///	unsigned n;
+///
+///	for (n = 0, pos = 0; info[pos]; pos += len, n++) {
+///		len = info[pos++] - '0';
+///		if (strncasecmp(s, info + pos, len) == 0) {
+///			if (endptr)
+///				*endptr = (char*)s + len;
+///			return n;
+///		}
+///	}
+///
+///	if (endptr)
+///		*endptr = (char*)s;
+///
+///	return -1; /* no match */
+/// }
 
-	for (n = 0, pos = 0; info[pos]; pos += len, n++) {
-		len = info[pos++] - '0';
-		if (strncasecmp(s, info + pos, len) == 0) {
-			if (endptr)
-				*endptr = (char*)s + len;
-			return n;
-		}
-	}
+/// /* parse for built-in keywords.
+///  * return -1 on failure.
+///  * returns enum keyword cast to int on success.
+///  */
+/// static int
+/// parse_keyword(const char *s, char **endptr)
+/// {
+///	/* must be in the same order as enum keyword */
+///	const char keywords[] = "5PRINT5INPUT2IF4THEN4GOTO3FOR4NEXT5GOSUB6RETURN3END3LET";
+///
+///	return generic_parser(s, endptr, keywords);
+/// }
 
-	if (endptr)
-		*endptr = (char*)s;
-
-	return -1; /* no match */
-}
-
-/* parse for built-in keywords.
- * return -1 on failure.
- * returns enum keyword cast to int on success.
- */
-static int
-parse_keyword(const char *s, char **endptr)
-{
-	/* must be in the same order as enum keyword */
-	const char keywords[] = "5PRINT5INPUT2IF4THEN4GOTO3FOR4NEXT5GOSUB6RETURN3END3LET";
-
-	return generic_parser(s, endptr, keywords);
-}
-
-/* parse for built-in functions.
- * return -1 on failure.
- * returns enum function cast to int on success.
- */
-static int
-parse_function(const char *s, char **endptr)
-{
-	/* must be in the same order as enum keyword */
-	const char functions[] = "3ABS3ATN3COS3EXP3INT3LOG3RND3SGN3SIN3SQR3TAN";
-
-	/* check for FNx */
-	if (toupper(s[0]) == 'F' && toupper(s[1]) == 'N' && isdigit(s[2]))
-		return F_FN0 + s[2] - '0';
-
-	return generic_parser(s, endptr, functions);
-}
+/// /* parse for built-in functions.
+///  * return -1 on failure.
+///  * returns enum function cast to int on success.
+///  */
+/// static int
+/// parse_function(const char *s, char **endptr)
+/// {
+///	/* must be in the same order as enum keyword */
+///	const char functions[] = "3ABS3ATN3COS3EXP3INT3LOG3RND3SGN3SIN3SQR3TAN";
+///
+///	/* check for FNx */
+///	if (toupper(s[0]) == 'F' && toupper(s[1]) == 'N' && isdigit(s[2]))
+///		return F_FN0 + s[2] - '0';
+///
+///	return generic_parser(s, endptr, functions);
+/// }
 
 /* evalutes numeric expression (floating point) */
 static int
@@ -569,3 +920,4 @@ main(int argc, char **argv)
 
 	return 0;
 }
+#endif
