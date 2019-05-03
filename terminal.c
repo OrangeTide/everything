@@ -247,6 +247,7 @@ terminal_refresh(void)
 		bg = BG_PART(screen[cur]);
 		putp(tparm(_setab, bg));
 		fg = FG_PART(screen[cur]);
+		// TODO: should we go to the start of the line?
 		putp(tparm(_setaf, fg));
 		for (x = 0; x < vwidth; x++) {
 			struct cell cell = screen[cur + x];
