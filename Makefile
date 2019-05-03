@@ -61,6 +61,9 @@ ifeq ($(OS),Windows_NT)
 	# curses
 	PKGCFLAGS.curses =
 	PKGLIBS.curses = -lpdcurses
+	# terminfo
+	PKGCFLAGS.terminfo =
+	PKGLIBS.terminfo = -ltinfo
 	# sdl2-static
 	PKGCFLAGS.sdl2-static =
 	PKGLIBS.sdl2-static = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc	
