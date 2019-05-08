@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <locale.h>
 
+#include <sys/select.h>
 #include <unistd.h>
 #include <termios.h>
 #include <term.h>
@@ -189,6 +190,8 @@ terminal_open(void)
 	tcgetattr(STDIN_FILENO, &old_mode);
 	raw_mode = old_mode;
 	raw_mode.c_lflag &= ~(ECHO | ICANON); /* disable line mode and echo */
+	raw_mode.c_cc[VMIN] = 1;
+	raw_mode.c_cc[VTIME] = 0;
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_mode);
 
 	screen_length = vstride * vheight;
@@ -240,8 +243,10 @@ terminal_refresh(void)
 	unsigned fg = FG_PART(screen[0]), bg = BG_PART(screen[0]);
 
 	for (y = 0; y < vheight; y++) {
-		// TODO: should we go to the start of the line?
+		// TODO: should we reposition the cursor?
+		bg = BG_PART(screen[cur]);
 		putp(tparm(_setab, bg));
+		fg = FG_PART(screen[cur]);
 		putp(tparm(_setaf, fg));
 		for (x = 0; x < vwidth; x++) {
 			struct cell cell = screen[cur + x];
@@ -260,8 +265,37 @@ terminal_refresh(void)
 				buf_outch(*s++);
 		}
 		cur += vstride;
+		if (_sgr0) /* reset attributes */
+			tputs(tparm(_sgr0), 1, buf_putc);
 		buf_outctrl('\n'); // TODO: should we use newline here?
 	}
 
 	buf_flush();
+}
+
+void
+terminal_wait(int msec_timeout)
+{
+	fd_set rfds;
+	struct timeval deadline;
+	int topfd = STDIN_FILENO;
+
+	deadline.tv_sec = msec_timeout / 1000;
+	deadline.tv_usec = (msec_timeout % 1000) * 1000;
+
+	FD_ZERO(&rfds);
+	FD_SET(STDIN_FILENO, &rfds);
+
+	int e = select(topfd + 1, &rfds, NULL, NULL, &deadline);
+	if (e < 0) {
+		        perror("select()");
+			        return -1;
+	}
+
+	if (!e)
+		        return 0; /* timeout */
+	if (FD_ISSET(STDIN_FILENO, &rfds))
+		        return 1; /* data pending */
+
+	return 0;
 }
