@@ -27,7 +27,9 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		}
 
 		cgatext_refresh();
-		cgatext_process_events();
+		if (cgatext_process_events())
+			break;
+
 		// TODO: check for keys
 
 		frame++;

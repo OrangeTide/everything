@@ -14,7 +14,7 @@ JDM_EMBED_FILE(sheet1_bmp, "cgatext8.bmp");
 #define TILE_WIDTH 8
 #define TILE_HEIGHT 8
 
-static int out_width, out_height, out_scale;
+static int out_width, out_height, out_scale_x = 1, out_scale_y = 2;
 static SDL_Window *main_win;
 static SDL_Renderer *main_ren;
 static SDL_Texture *sheet1_tex;
@@ -65,7 +65,7 @@ cgatext_refresh(void)
 	dst.w = src.w;
 	dst.h = src.h;
 
-	SDL_RenderSetScale(main_ren, out_scale, out_scale);
+	SDL_RenderSetScale(main_ren, out_scale_x, out_scale_y);
 
 	/* clear screen to brown */
 	SDL_SetRenderDrawColor(main_ren, 170, 85, 0, SDL_ALPHA_OPAQUE); // border color
@@ -138,17 +138,13 @@ cgatext_driver_init(void)
 		return -1;
 	}
 
-	if (cgatext_init(80, 60))
-		return -1;
-
 	cgatext_screen_info(&screen_width, &screen_height);
 
-	out_scale = 1;
-	out_width = out_scale * screen_width * TILE_WIDTH;
-	out_height = out_scale * screen_height * TILE_HEIGHT;
+	out_width = out_scale_x * screen_width * TILE_WIDTH;
+	out_height = out_scale_y * screen_height * TILE_HEIGHT;
 	fullscreen = false;
 
-	main_win = SDL_CreateWindow("Tile",
+	main_win = SDL_CreateWindow("<your title here>",
 		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		out_width, out_height, SDL_WINDOW_RESIZABLE);
 
@@ -176,7 +172,7 @@ fail:
 	return -1;
 }
 
-void
+int
 cgatext_process_events(void)
 {
 	SDL_Event e;
@@ -185,18 +181,19 @@ cgatext_process_events(void)
 	if (!SDL_WaitEvent(&e)) {
 		SDL_Log("Failed SDL_WaitEvent: %s", SDL_GetError());
 		// TODO: set some error or exit status
-		return;
+		return -1;
 	}
 	switch (e.type) {
 	case SDL_QUIT:
-		return; /* quit! */
+
+		return -1; /* quit! */
 	case SDL_KEYDOWN:
 	case SDL_KEYUP:
 		switch (e.key.keysym.sym) {
 		case SDLK_ESCAPE:
 			// TODO: prompt before exiting
 			if (e.type == SDL_KEYDOWN)
-				return; /* quit! */
+				return -1; /* quit! */
 			break;
 		case SDLK_F11: /* fullscreen */
 			if (e.type == SDL_KEYDOWN) {
@@ -223,6 +220,8 @@ cgatext_process_events(void)
 		}
 		break;
 	}
+
+	return 0;
 }
 
 void
