@@ -10,6 +10,7 @@
 
 JDM_EMBED_FILE(sheet1_bmp, "cgatext8.bmp");
 
+#define TARGET_FPS 100 /* use 100 frames per second as our target rate */
 #define TILES_PER_ROW 32 /* font texture is 32 colums x 8 rows */
 #define TILE_WIDTH 8
 #define TILE_HEIGHT 8
@@ -23,6 +24,8 @@ static keystate *key_left;
 static keystate *key_right;
 static keystate *key_up;
 static keystate *key_down;
+static Uint64 last_frame, /* timestamp of most recent frame */
+	freq, frame_rate;
 
 static const SDL_Color vga_pal[16] = {
 	{ 0, 0, 0, 0 },
@@ -99,7 +102,8 @@ cgatext_refresh(void)
 	}
 
 	SDL_RenderPresent(main_ren);
-	// TODO: wait for events or timeout to throttle the refresh rate
+
+	last_frame = SDL_GetPerformanceCounter();
 }
 
 static int
@@ -151,6 +155,10 @@ cgatext_driver_init(void)
 	main_ren = SDL_CreateRenderer(main_win, -1,
 		SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
+	freq = SDL_GetPerformanceFrequency();
+	last_frame = SDL_GetPerformanceCounter();
+	frame_rate = freq / TARGET_FPS;
+
 	if (load())
 		goto fail;
 
@@ -172,31 +180,23 @@ fail:
 	return -1;
 }
 
-int
-cgatext_process_events(void)
+static int
+process_event(SDL_Event *e)
 {
-	SDL_Event e;
-
-	// TODO: poll for events
-	if (!SDL_WaitEvent(&e)) {
-		SDL_Log("Failed SDL_WaitEvent: %s", SDL_GetError());
-		// TODO: set some error or exit status
-		return -1;
-	}
-	switch (e.type) {
+	switch (e->type) {
 	case SDL_QUIT:
 
 		return -1; /* quit! */
 	case SDL_KEYDOWN:
 	case SDL_KEYUP:
-		switch (e.key.keysym.sym) {
+		switch (e->key.keysym.sym) {
 		case SDLK_ESCAPE:
 			// TODO: prompt before exiting
-			if (e.type == SDL_KEYDOWN)
+			if (e->type == SDL_KEYDOWN)
 				return -1; /* quit! */
 			break;
 		case SDLK_F11: /* fullscreen */
-			if (e.type == SDL_KEYDOWN) {
+			if (e->type == SDL_KEYDOWN) {
 				fullscreen = !fullscreen;
 				if (fullscreen)
 					SDL_SetWindowFullscreen(main_win,
@@ -206,20 +206,50 @@ cgatext_process_events(void)
 			}
 			break;
 		case SDLK_LEFT: // TODO: remappable keys
-			keystate_send(key_left, e.type == SDL_KEYDOWN);
+			keystate_send(key_left, e->type == SDL_KEYDOWN);
 			break;
 		case SDLK_RIGHT: // TODO: remappable keys
-			keystate_send(key_right, e.type == SDL_KEYDOWN);
+			keystate_send(key_right, e->type == SDL_KEYDOWN);
 			break;
 		case SDLK_UP: // TODO: remappable keys
-			keystate_send(key_up, e.type == SDL_KEYDOWN);
+			keystate_send(key_up, e->type == SDL_KEYDOWN);
 			break;
 		case SDLK_DOWN: // TODO: remappable keys
-			keystate_send(key_down, e.type == SDL_KEYDOWN);
+			keystate_send(key_down, e->type == SDL_KEYDOWN);
 			break;
 		}
 		break;
 	}
+	return 0;
+}
+
+int
+cgatext_process_events(void)
+{
+	SDL_Event e;
+	Uint64 now, wait_msec, next_frame = last_frame + frame_rate;
+
+#if 0 /* maybe this helps? I didn't measure it */
+	/* collect queued events - unless we're out of time */
+	while (SDL_PollEvent(&e)) {
+		if (process_event(&e))
+			return -1;
+		now = SDL_GetPerformanceCounter();
+		if (now > next_frame)
+			break;
+	}
+#endif
+	do {
+		/* wait for an event up to where the next frame should land */
+		now = SDL_GetPerformanceCounter();
+		if (now >= next_frame)
+			break;
+		wait_msec = (next_frame - now) / (freq / 1000);
+		if (SDL_WaitEventTimeout(&e, wait_msec) < 0)
+			return 0;
+		if (process_event(&e))
+			return -1;
+	} while (now < next_frame);
 
 	return 0;
 }
@@ -236,23 +266,3 @@ cgatext_driver_done(void)
 
 	SDL_Quit();
 }
-
-#if 0 // TODO: remove me
-int
-main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
-{
-	if (init())
-		return 1;
-
-	loop();
-
-	done();
-
-	return 0;
-}
-// 	Uint64 prev, now, freq = SDL_GetPerformanceFrequency();
-
-//	prev = SDL_GetPerformanceCounter();
-//	while (1) {
-//		now = SDL_GetPerformanceCounter();
-#endif
