@@ -142,7 +142,7 @@ cgatext_driver_init(void)
 		return -1;
 	}
 
-//TODO:	cgatext_screen_info(&screen_width, &screen_height);
+	cgatext_screen_info(&screen_width, &screen_height);
 
 	out_width = out_scale_x * screen_width * TILE_WIDTH;
 	out_height = out_scale_y * screen_height * TILE_HEIGHT;
@@ -223,11 +223,24 @@ process_event(SDL_Event *e)
 	return 0;
 }
 
+/*
+ * timeout_msec = 0; wait until next frame
+ * timeout_msec > 0; wait milliseconds
+ * timeout_msec < 0; error
+ */
 int
-cgatext_process_events(void)
+cgatext_process_events(int timeout_msec)
 {
 	SDL_Event e;
-	Uint64 now, wait_msec, next_frame = last_frame + frame_rate;
+	Uint64 now, wait_msec, end_time;
+
+	if (timeout_msec > 0)
+		end_time = (timeout_msec * freq / 1000) +
+				SDL_GetPerformanceCounter();
+	else if (timeout_msec == 0)
+		end_time = last_frame + frame_rate; /* wait until next frame */
+	else
+		return -1;
 
 #if 0 /* maybe this helps? I didn't measure it */
 	/* collect queued events - unless we're out of time */
@@ -235,21 +248,21 @@ cgatext_process_events(void)
 		if (process_event(&e))
 			return -1;
 		now = SDL_GetPerformanceCounter();
-		if (now > next_frame)
+		if (now > end_time)
 			break;
 	}
 #endif
 	do {
 		/* wait for an event up to where the next frame should land */
 		now = SDL_GetPerformanceCounter();
-		if (now >= next_frame)
+		if (now >= end_time)
 			break;
-		wait_msec = (next_frame - now) / (freq / 1000);
+		wait_msec = (end_time - now) / (freq / 1000);
 		if (SDL_WaitEventTimeout(&e, wait_msec) < 0)
 			return 0;
 		if (process_event(&e))
 			return -1;
-	} while (now < next_frame);
+	} while (now < end_time);
 
 	return 0;
 }

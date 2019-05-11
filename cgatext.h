@@ -26,7 +26,7 @@ void cgatext_copyrect(int dstx, int dsty, const cgatext_region *src);
 void cgatext_hscroll(cgatext_cell fillch, const cgatext_region *region, int scroll);
 void cgatext_vscroll(cgatext_cell fillch, const cgatext_region *region, int scroll);
 void cgatext_set(cgatext_cell ch, int x, int y);
-int cgatext_process_events(void); /* 0 = OK, negative = quit or error */
+int cgatext_process_events(int timeout_msec); /* return 0 = OK, negative = quit or error */
 void cgatext_refresh(void);
 int cgatext_driver_init(void); /* internal use - do not call in application */
 void cgatext_driver_done(void); /* internal use - do not call in application */

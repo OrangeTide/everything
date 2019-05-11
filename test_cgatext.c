@@ -20,7 +20,7 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		cgatext_cell *row = screen;
 		for (y = 0; y < height; y++, row += width) {
 			for (x = 0; x < width; x++) {
-#if 0
+#if 1
 				/* exercise every character */
 				row[x].ch = (frame + x + (y * width) + 'A') % 256;
 #else
@@ -33,7 +33,7 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		}
 
 		cgatext_refresh();
-		if (cgatext_process_events())
+		if (cgatext_process_events(200))
 			break;
 
 		// TODO: check for keys

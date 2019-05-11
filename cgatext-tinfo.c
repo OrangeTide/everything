@@ -1,4 +1,8 @@
 /* cgatext-tinfo.c : Terminfo driver for cgatext library - public domain. */
+/* TODO:
+ * - read & decode keys
+ * - map keys to keystate API
+ */
 #include "cgatext.h"
 
 #include <stdlib.h>
@@ -8,6 +12,9 @@
 #include <unistd.h>
 #include <termios.h>
 #include <term.h>
+
+#define KEYSTATE_IMPLEMENTATION 1
+#include "keystate.h"
 
 /******************************************************************************/
 
@@ -145,15 +152,14 @@ buf_putc(int c)
 /******************************************************************************/
 
 int
-cgatext_process_events(void)
+cgatext_process_events(int timeout_msec)
 {
 	fd_set rfds;
 	struct timeval deadline;
 	int topfd = STDIN_FILENO;
-	unsigned msec_timeout = 500; /* 2 frames per second */
 
-	deadline.tv_sec = msec_timeout / 1000u;
-	deadline.tv_usec = (msec_timeout % 1000u) * 1000u;
+	deadline.tv_sec = timeout_msec / 1000u;
+	deadline.tv_usec = (timeout_msec % 1000u) * 1000u;
 
 	FD_ZERO(&rfds);
 	FD_SET(STDIN_FILENO, &rfds);
@@ -195,7 +201,7 @@ cgatext_refresh(void)
 
 	for (y = 0; y < vheight; y++) {
 		/* TODO: center onto screen if real resolution is larger */
-		tputs(tparm(_cup, y + 1, 1), 1, buf_putc);
+		tputs(tparm(_cup, y, 0), 1, buf_putc);
 		bg = BG_PART(screen[cur]);
 		tputs(tparm(_setab, color_tab[bg % 16]), 1, buf_putc);
 		fg = FG_PART(screen[cur]);
