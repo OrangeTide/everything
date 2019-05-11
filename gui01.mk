@@ -6,4 +6,6 @@ else
 	gui01.PKGS = x11
 	gui01.SRCS += drv_xlib.c
 endif
+ifeq ($(HAS_SDL),1)
 TARGETS += gui01
+endif

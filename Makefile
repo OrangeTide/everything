@@ -62,11 +62,11 @@ ifeq ($(OS),Windows_NT)
 	PKGCFLAGS.curses =
 	PKGLIBS.curses = -lpdcurses
 	# terminfo
-	PKGCFLAGS.terminfo =
-	PKGLIBS.terminfo = -ltinfo
+	PKGCFLAGS.tinfo =
+	PKGLIBS.tnfo = -ltinfo
 	# sdl2-static
 	PKGCFLAGS.sdl2-static = -IC:\TDM-GCC-64\x86_64-w64-mingw32\include\SDL2
-	PKGLIBS.sdl2-static = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc	
+	PKGLIBS.sdl2-static = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc
 	# sdl2 (dynamic)
 	PKGCFLAGS.sdl2 = -IC:\TDM-GCC-64\x86_64-w64-mingw32\include\SDL2
 	PKGLIBS.sdl2 = -lmingw32 -lSDL2main -lSDL2
@@ -83,6 +83,18 @@ else ifeq ($(OS),Linux)
 	# glu
 	PKGCFLAGS.glu32 =
 	PKGLIBS.glu32 = -lglu
+	# sdl2
+	PKGCFLAGS.sdl2 := $(shell sdl2-config --cflags)
+	PKGLIBS.sdl2 := $(shell sdl2-config --libs)
+endif
+
+# detect SDL2
+ifeq ($(HAS_SDL),)
+ifneq ($(PKGLIBS.sdl2),)
+HAS_SDL := 1
+else
+HAS_SDL := 0
+endif
 endif
 
 # include all targets
