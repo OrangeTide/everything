@@ -245,10 +245,10 @@ terminal_refresh(void)
 	for (y = 0; y < vheight; y++) {
 		// TODO: should we reposition the cursor?
 		bg = BG_PART(screen[cur]);
-		putp(tparm(_setab, bg));
+		tputs(tparm(_setab, bg), 1, buf_putc);
 		fg = FG_PART(screen[cur]);
 		// TODO: should we go to the start of the line?
-		putp(tparm(_setaf, fg));
+		tputs(tparm(_setaf, fg), 1, buf_putc);
 		for (x = 0; x < vwidth; x++) {
 			struct cell cell = screen[cur + x];
 			if (bg != BG_PART(cell)) {
