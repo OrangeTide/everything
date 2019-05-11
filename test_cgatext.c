@@ -13,6 +13,9 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 	if (!screen)
 		return 1;
 
+	cgatext_cursor_style(CGATEXT_CURSOR_BLOCK);
+	cgatext_cursor(1, 1);
+
 	int frame = 0;
 	do {
 		/* draw some simple thing */
@@ -34,15 +37,27 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 
 		cgatext_refresh();
 		if (cgatext_process_events(200))
-			break;
+			goto quit;
 
 		// TODO: check for keys
 
 		frame++;
 		if (frame >= (26 * 16))
 			frame = 0;
-	} while (1);
+	} while (frame < 5);
 
+	/* wait for quit ... */
+	int x = 1, y = 1;
+	do {
+		if (x > width) x = 0;
+		if (y > height) y = 0;
+		cgatext_cursor(x++, y++);
+		cgatext_refresh();
+		if (cgatext_process_events(200))
+			goto quit;
+	} while(1);
+
+quit:
 	cgatext_done();
 
 	return 0;

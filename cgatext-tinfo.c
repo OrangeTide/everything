@@ -45,9 +45,11 @@ static unsigned buf_len, buf_max = sizeof(buf);
 static unsigned short vstart = 0; /* start of video memory */
 static enum { MODE_MONOCHROME, MODE_8COLOR, MODE_16COLOR, MODE_256COLOR } mode = MODE_256COLOR;
 static int _colors;
-static const char *_setab, *_setaf, *_sgr0, *_cup; /* terminfo sequences */
+static const char *_setab, *_setaf, *_sgr0, *_cup, /* terminfo sequences */
+	*_civis, *_cnorm;
 static cgatext_cell *screen; /* screen memory */
-
+static cgatext_cursor_style_t cursor_style;
+static int cursor_x, cursor_y;
 
 /* map IBM 16-color palette to terminfo colors */
 static const unsigned char color_tab[] = {
@@ -148,7 +150,6 @@ buf_putc(int c)
 	return 0;
 }
 
-
 /******************************************************************************/
 
 int
@@ -179,6 +180,21 @@ cgatext_process_events(int timeout_msec)
 }
 
 void
+cgatext_cursor_style(cgatext_cursor_style_t style)
+{
+	cursor_style = style;
+}
+
+void
+cgatext_cursor(int x, int y)
+{
+	cursor_x = x;
+	cursor_y = y;
+	tputs(tparm(_cup, cursor_y, cursor_x), 1, buf_putc);
+	buf_flush();
+}
+
+void
 cgatext_refresh(void)
 {
 	static int vwidth, vheight, vstride;
@@ -194,6 +210,8 @@ cgatext_refresh(void)
 
 	if (_sgr0) /* reset attributes */
 		tputs(tparm(_sgr0), 1, buf_putc);
+
+	tputs(tparm(_civis), 1, buf_putc);
 
 	int x, y;
 	unsigned short cur = vstart;
@@ -227,6 +245,13 @@ cgatext_refresh(void)
 			tputs(tparm(_sgr0), 1, buf_putc);
 	}
 
+	if (cursor_style) {
+		tputs(tparm(_cnorm), 1, buf_putc);
+		tputs(tparm(_cup, cursor_y, cursor_x), 1, buf_putc);
+	} else {
+		tputs(tparm(_civis), 1, buf_putc);
+	}
+
 	buf_flush();
 }
 
@@ -255,6 +280,8 @@ cgatext_driver_init(void)
 	_setaf = tigetstr("setaf");
 	_sgr0 = tigetstr("sgr0");
 	_cup = tigetstr("cup");
+	_civis = tigetstr("civis");
+	_cnorm = tigetstr("cnorm");
 
 	if (_colors < 0 || !_setab || !_setaf)
 		return -1; /* Terminal type unsupported */

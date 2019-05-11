@@ -26,6 +26,8 @@ static keystate *key_up;
 static keystate *key_down;
 static Uint64 last_frame, /* timestamp of most recent frame */
 	freq, frame_rate;
+static cgatext_cursor_style_t cursor_style;
+static int cursor_x, cursor_y;
 
 static const SDL_Color vga_pal[16] = {
 	{ 0, 0, 0, 0 },
@@ -86,16 +88,27 @@ cgatext_refresh(void)
 
 			/* background color */
 			SDL_SetRenderDrawColor(main_ren,
-				vga_pal[cell->bg].r, vga_pal[cell->bg].g, vga_pal[cell->bg].b,
+				vga_pal[cell->bg].r, vga_pal[cell->bg].g,
+				vga_pal[cell->bg].b,
 				SDL_ALPHA_OPAQUE);
 			SDL_RenderFillRect(main_ren, &dst);
 
 			/* foreground color - draw the text with a color-mod */
 			SDL_SetTextureColorMod(sheet1_tex,
-				vga_pal[cell->fg].r, vga_pal[cell->fg].g, vga_pal[cell->fg].b);
-			SDL_SetRenderDrawBlendMode(main_ren, SDL_BLENDMODE_NONE);
+				vga_pal[cell->fg].r, vga_pal[cell->fg].g,
+				vga_pal[cell->fg].b);
+			SDL_SetRenderDrawBlendMode(main_ren,
+				SDL_BLENDMODE_NONE);
 
 			SDL_RenderCopy(main_ren, sheet1_tex, &src, &dst);
+
+			if (cursor_style && x == cursor_x && y == cursor_y) {
+				// TODO: render different cursor styles
+				// TODO: blink the cursor
+				SDL_SetRenderDrawColor(main_ren, 255, 255, 255,
+					SDL_ALPHA_OPAQUE);
+				SDL_RenderFillRect(main_ren, &dst);
+			}
 
 			dst.x += TILE_WIDTH;
 		}
@@ -104,6 +117,19 @@ cgatext_refresh(void)
 	SDL_RenderPresent(main_ren);
 
 	last_frame = SDL_GetPerformanceCounter();
+}
+
+void
+cgatext_cursor_style(cgatext_cursor_style_t style)
+{
+	cursor_style = style;
+}
+
+void
+cgatext_cursor(int x, int y)
+{
+	cursor_x = x;
+	cursor_y = y;
 }
 
 static int

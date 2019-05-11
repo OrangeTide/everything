@@ -4,7 +4,7 @@
 /* TODO:
  * remove cgatext_screen_info() and direct writing to screen buffer
  * rename cgatext_set() to cgatext_putc()
- * add cursor state and movement APIs
+ * change drawing model to make it easier to implement blinking cursor
  * rename init/done to open/close.
  * add timeout for process_events()
  * optional - rename to cgatext to b800
@@ -18,6 +18,12 @@ typedef struct { unsigned short ch; unsigned char fg, bg; } cgatext_cell;
 
 typedef struct { int x, y, w, h; } cgatext_region;
 
+typedef enum cgatext_cursor_style {
+	CGATEXT_CURSOR_INVISIBLE,
+	CGATEXT_CURSOR_BAR,
+	CGATEXT_CURSOR_BLOCK,
+} cgatext_cursor_style_t;
+
 int cgatext_init(int width, int height);
 void cgatext_done(void);
 cgatext_cell *cgatext_screen_info(int *width, int *height);
@@ -30,4 +36,6 @@ int cgatext_process_events(int timeout_msec); /* return 0 = OK, negative = quit 
 void cgatext_refresh(void);
 int cgatext_driver_init(void); /* internal use - do not call in application */
 void cgatext_driver_done(void); /* internal use - do not call in application */
+void cgatext_cursor_style(cgatext_cursor_style_t style);
+void cgatext_cursor(int x, int y);
 #endif
