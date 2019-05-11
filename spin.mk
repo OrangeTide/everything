@@ -1,5 +1,7 @@
 spin.SRCS = spin.c
+ifeq ($(HAS_SDL),1)
 TARGETS += spin
+endif
 
 ifeq ($(OS),Windows_NT)
   # Windows-only taget
