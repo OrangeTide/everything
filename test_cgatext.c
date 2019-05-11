@@ -20,9 +20,15 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		cgatext_cell *row = screen;
 		for (y = 0; y < height; y++, row += width) {
 			for (x = 0; x < width; x++) {
+#if 0
+				/* exercise every character */
+				row[x].ch = (frame + x + (y * width) + 'A') % 256;
+#else
+				/* exercise just the alphabet */
 				row[x].ch = 'A' + (frame % 26);
-				row[x].fg = (frame + x) % 16;
-				row[x].bg = (frame + y) % 16;
+#endif
+				row[x].fg = (frame + y) % 16;
+				row[x].bg = (frame + x) % 16;
 			}
 		}
 

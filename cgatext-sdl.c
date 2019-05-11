@@ -142,7 +142,7 @@ cgatext_driver_init(void)
 		return -1;
 	}
 
-	cgatext_screen_info(&screen_width, &screen_height);
+//TODO:	cgatext_screen_info(&screen_width, &screen_height);
 
 	out_width = out_scale_x * screen_width * TILE_WIDTH;
 	out_height = out_scale_y * screen_height * TILE_HEIGHT;

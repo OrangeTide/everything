@@ -1,6 +1,18 @@
 /* cgatext.h : CGA text mode retro graphics - public domain. */
 #ifndef CGATEXT_H
 #define CGATEXT_H
+/* TODO:
+ * remove cgatext_screen_info() and direct writing to screen buffer
+ * rename cgatext_set() to cgatext_putc()
+ * add cursor state and movement APIs
+ * rename init/done to open/close.
+ * add timeout for process_events()
+ * optional - rename to cgatext to b800
+ */
+
+#define CHAR_PART(cell) ((cell).ch)
+#define FG_PART(cell) ((cell).fg)
+#define BG_PART(cell) ((cell).bg)
 
 typedef struct { unsigned short ch; unsigned char fg, bg; } cgatext_cell;
 
