@@ -1,5 +1,6 @@
 /* ihex.c : Intel HEX parser - public domain */
 #include <stdio.h>
+#include <string.h>
 #include "ihex.h"
 
 /* reads exactly 2 hex digits */
@@ -45,7 +46,7 @@ decode_hex_word(const char buf[4])
 	if (b < 0)
 		return -1;
 
-	return (b << 8) | a;
+	return (a << 8) | b;
 }
 
 /* I8HEX files use only record types 00 and 01 (16 bit addresses) */
@@ -53,7 +54,7 @@ int
 ihex_load(const char *filename, int (*process)(unsigned address, unsigned count, unsigned char *data))
 {
 	FILE *f;
-	char line[80], *s;
+	char line[100], *s;
 	int i, count, addr, rec, cksum;
 	unsigned char out[256], total;
 	int end_of_file;
@@ -69,6 +70,10 @@ ihex_load(const char *filename, int (*process)(unsigned address, unsigned count,
 	total = 0;
 	line_num = 0;
 	while (fgets(line, sizeof(line), f)) {
+		if (!strchr(line, '\n')) {
+			fprintf(stderr, "%s:%d:line too long\n", filename, line_num);
+			goto failure;
+		}
 		s = line;
 		line_num++;
 
