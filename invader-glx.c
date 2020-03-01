@@ -1,16 +1,15 @@
-// this file is included by invader.c
-//
+#include "invader-internal.h"
 #include <GL/glx.h>
 
 static GLXContext gl_ctx;
 
-static void
+void
 swap_buffers(void)
 {
 	glXSwapBuffers(dpy, win);
 }
 
-static XVisualInfo *
+XVisualInfo *
 create_gl_context(void)
 {
 	static int dbl_attribs[] = {
@@ -25,7 +24,7 @@ create_gl_context(void)
 	return vi;
 }
 
-static void
+void
 destroy_gl_context(void)
 {
 	if (win)
@@ -34,7 +33,7 @@ destroy_gl_context(void)
 		glXDestroyContext(dpy, gl_ctx);
 }
 
-static void
+void
 set_gl_context(void)
 {
 	glXMakeCurrent(dpy, win, gl_ctx);

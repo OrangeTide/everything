@@ -1,3 +1,4 @@
+#include "invader-internal.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,10 +6,10 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
-#include "invader-xbase.c"
-#include "invader-glx.c"
+//#include "invader-xbase.c"
+//#include "invader-glx.c"
 
-static void
+void
 reshape(int width, int height)
 {
 	glViewport(0, 0, width, height);
@@ -21,7 +22,7 @@ reshape(int width, int height)
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-static void
+void
 paint(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);

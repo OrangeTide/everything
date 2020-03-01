@@ -1,22 +1,19 @@
-// this file is included by invader.c
-//
+#include "invader-internal.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-static void reshape(int width, int height); // defined by invader.c
-static void paint(void); // defined by invader.c
-static void swap_buffers(void); // defined by invader-glx.c
-static XVisualInfo *create_gl_context(void); // defined by invader-glx.c
-static void destroy_gl_context(void); // defined by invader-glx.c
-static void set_gl_context(void); // defined by invader-glx.c
+Display *dpy;
+Window win;
 
 static const char *default_display;
-static Display *dpy;
-static Window win;
 static Atom wm_delete_window, wm_protocols;
 
-static int
+int
 process_args(int argc, char *argv[])
 {
 	int i;
@@ -54,7 +51,13 @@ process_args(int argc, char *argv[])
 	return 0;
 }
 
-static int
+static Bool
+is_mapnotify(Display *dpy __attribute__((unused)), XEvent *ev, XPointer arg)
+{
+	return (ev->type == MapNotify) && (ev->xmap.window == (Window)arg);
+}
+
+int
 make_win(int width, int height, const char *title)
 {
 	dpy = XOpenDisplay(default_display);
@@ -88,25 +91,24 @@ make_win(int width, int height, const char *title)
 	Atom protocols[] = { wm_delete_window };
 	XSetWMProtocols(dpy, win, protocols, sizeof(protocols) / sizeof(*protocols));
 
+	int snum = DefaultScreen(dpy);
 	XSizeHints sizehints;
-	sizehints.flags = PPosition | PBaseSize | PMinSize | PMaxSize | PResizeInc | PAspect;
-	sizehints.x = 200; // TODO: center
-	sizehints.y = 100; // TODO: center
+	sizehints.flags = PPosition | PBaseSize | PMinSize | PAspect;
+	sizehints.x = (DisplayWidth(dpy, snum) - width) / 2; /* center */
+	sizehints.y = (DisplayHeight(dpy, snum) - height) / 2;
 	sizehints.base_width = width;
 	sizehints.base_height = height;
 	sizehints.min_width = width / 8;
 	sizehints.min_height = height / 8;
-	sizehints.max_width = width * 8 ;
-	sizehints.max_height = height * 8;
-	sizehints.width_inc = 16;
-	sizehints.height_inc = 16;
 	sizehints.min_aspect.x = width;
 	sizehints.min_aspect.y = height;
 	sizehints.max_aspect.x = width;
 	sizehints.max_aspect.y = height;
-	XSetWMNormalHints(dpy, win, &sizehints );
+	XSetWMNormalHints(dpy, win, &sizehints);
 
 	XMapWindow(dpy, win);
+	XEvent ev;
+	XIfEvent(dpy, &ev, is_mapnotify, (XPointer)win);
 
 	set_gl_context();
 
@@ -115,7 +117,7 @@ make_win(int width, int height, const char *title)
 	return 0;
 }
 
-static void
+void
 loop(void)
 {
 	int dirty;
