@@ -26,6 +26,20 @@ void
 paint(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
+	glBegin(GL_TRIANGLES);
+	/* rainbow */
+	glColor3f(1.0, 0.0, 0.0);
+	glVertex3f(-3.0, -3.0, 1.0);
+	glColor3f(0.0, 1.0, 0.0);
+	glVertex3f(3.0, -3.0, 1.0);
+	glColor3f(0.0, 0.0, 1.0);
+	glVertex3f(0.0, 3.0, 1.0);
+	/* the most beautiful green */
+	glColor3f(0.46, 0.73, 0.0);
+	glVertex3f(0.0, 1.0, 1.0);
+	glVertex3f(-1.0, -1.0, 1.0);
+	glVertex3f( 1.0, -1.0, 1.0);
+	glEnd();
 }
 
 int
