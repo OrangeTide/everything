@@ -50,11 +50,11 @@ ifeq ($(OS),Windows_NT)
 	PKGCFLAGS.opengl32 =
 	PKGLIBS.opengl32 = -lopengl32
 	# glu
-	PKGCFLAGS.glu32 =
-	PKGLIBS.glu32 = -lglu32
+	PKGCFLAGS.glu =$(PKGCFLAGS.opengl32)
+	PKGLIBS.glu = $(PKGLIBS.opengl32) -lglu32
 	# gl - an alias for what we typically consider OpenGL
-	PKGCFLAGS.gl = $(PKGCFLAGS.opengl32) $(PKGCFLAGS.glu32)
-	PKGLIBS.gl = $(PKGLIBS.opengl32) $(PKGLIBS.glu32)
+	PKGCFLAGS.gl = $(PKGCFLAGS.opengl32)
+	PKGLIBS.gl = $(PKGLIBS.opengl32)
 	# mintaro
 	PKGCFLAGS.mintaro =
 	PKGLIBS.mintaro = -lgdi32
@@ -80,9 +80,9 @@ else ifeq ($(OS),Linux)
 	# Libraries for math
 	PKGLIBS.m = -lm
 	PKGCFLAGS.m =
-	# glu
-	PKGCFLAGS.glu32 =
-	PKGLIBS.glu32 = -lglu
+	# Libraries for dlopen
+	PKGLIBS.dl = -ldl
+	PKGCFLAGS.dl =
 	# sdl2
 	PKGCFLAGS.sdl2 := $(shell sdl2-config --cflags)
 	PKGLIBS.sdl2 := $(shell sdl2-config --libs)
@@ -140,6 +140,4 @@ endif
 $(eval $(foreach target,$(TARGETS),$(call process-config,$(target))))
 
 $(eval $(foreach target,$(TARGETS),$(call gen-target,$(target))))
-
-# $(info TARGETS=$(TARGETS))
 ##### END #####
