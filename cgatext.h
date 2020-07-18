@@ -10,6 +10,7 @@
  * optional - rename to cgatext to b800
  */
 
+#if 0 // OLD API
 #define CHAR_PART(cell) ((cell).ch)
 #define FG_PART(cell) ((cell).fg)
 #define BG_PART(cell) ((cell).bg)
@@ -38,4 +39,29 @@ int cgatext_driver_init(void); /* internal use - do not call in application */
 void cgatext_driver_done(void); /* internal use - do not call in application */
 void cgatext_cursor_style(cgatext_cursor_style_t style);
 void cgatext_cursor(int x, int y);
+
+#else // NEW API
+/** common interfaces **/
+// TBD ...
+int cgatext_putc(int x, int y, unsigned short ch, unsigned char fg, unsigned char bg);
+// open questions: 
+// 1. should writes be immediate, or should there be a refresh phase?
+
+/** interfaces defined by the driver **/
+// TBD ...
+int cgatext_init(int width, int height);
+	// TODO: SDL should create a thread
+void cgatext_done(void);
+
+#ifdef CGATEXT_DRIVER
+/** interfaces only used by the driver **/
+// TBD ...
+typedef struct { unsigned short ch; unsigned char fg, bg; } cgatext_cell_t;
+
+int cgatext_allocate_screen(int width, int height);
+const cgatext_cell_t *cgatext_screen_info(int *width, int *height);
+#endif
+
+#endif
+
 #endif
