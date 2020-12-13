@@ -25,6 +25,15 @@ reshape(int width, int height)
 void
 paint(void)
 {
+	/* check errors - quit if found */
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		fprintf(stderr, "GL error 0x%04X\n", (unsigned)err);
+		loop_quit();
+		return;
+	}
+
+	//
 	glClear(GL_COLOR_BUFFER_BIT);
 	glBegin(GL_TRIANGLES);
 	/* rainbow */
@@ -49,6 +58,13 @@ main(int argc, char *argv[])
 		return 1;
 	if (make_win(640, 480, "Invader"))
 		return 1;
+
+	/* report some information for the logs */
+	fprintf(stderr, "GL_VENDOR: %s\n", glGetString(GL_VENDOR));
+	fprintf(stderr, "GL_RENDERER: %s\n", glGetString(GL_RENDERER));
+	fprintf(stderr, "GL_VERSION: %s\n", glGetString(GL_VERSION));
+
 	loop();
+
 	return 0;
 }

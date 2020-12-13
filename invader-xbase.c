@@ -3,15 +3,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 Display *dpy;
 Window win;
-
+static int x_quit;
 static const char *default_display;
 static Atom wm_delete_window, wm_protocols;
+
+void
+report_x_error(const char *msg)
+{
+	fprintf(stderr, "%s:%s\n", program_invocation_short_name, msg);
+}
 
 int
 process_args(int argc, char *argv[])
@@ -51,6 +58,12 @@ process_args(int argc, char *argv[])
 	return 0;
 }
 
+void
+loop_quit(void)
+{
+	x_quit = 1;
+}
+
 static Bool
 is_mapnotify(Display *dpy __attribute__((unused)), XEvent *ev, XPointer arg)
 {
@@ -68,6 +81,10 @@ make_win(int width, int height, const char *title)
 	Window root = DefaultRootWindow(dpy);
 
 	XVisualInfo *vi = create_gl_context();
+	if (!vi) {
+		XCloseDisplay(dpy);
+		return -1;
+	}
 	Colormap cmap = XCreateColormap(dpy, root, vi->visual, AllocNone);
 
 	XSetWindowAttributes swa;
@@ -123,7 +140,7 @@ loop(void)
 	int dirty;
 	XEvent ev;
 
-	while (1) {
+	while (!x_quit) {
 		if (XPending(dpy)) {
 			XNextEvent(dpy, &ev);
 			switch (ev.type) {
@@ -149,4 +166,3 @@ loop(void)
 		}
 	}
 }
-

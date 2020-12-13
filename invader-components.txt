@@ -1,0 +1,23 @@
+* GLES2/3
+  * extension string parsing
+  * extension function loading
+  * utils: shader file loading
+* window system events
+* key events
+  * name to scan code binding
+  * processing key events and sending to bindings
+  * language correct input
+* timers
+* gamepad detection & events
+  * binding events to callbacks
+  * loading gamepad mapping from SDL master file
+  * loading user mappings
+* audio
+  * playback
+  * mixing multiple sounds
+  * triggering one-shot and looping sounds
+* OBJ loading
+* texture & image loading
+* font loading & drawing
+* scripting
+  * TBD
