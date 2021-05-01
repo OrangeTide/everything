@@ -1,0 +1,2340 @@
+                   Object-Oriented Extensions to Pascal
+
+                            September 20, 1993
+
+
+              This is a draft document. It is to be used for review purposes
+              only. Implementors should not claim conformance to this
+              document.
+
+
+
+                             Table of contents
+                             -----------------
+
+           Introduction
+1          Scope
+2          References
+3          Definitions
+4          Definitional Conventions
+5          Compliance
+6          Object Extensions
+6.1        Class Definition
+6.1.1         Extension of the Type System
+6.1.2         Restrictions on Class Definitions
+6.1.3         Contents and Syntax of Class Definitions
+6.1.3.1          Kind of Class
+6.1.3.2          Inheritance List
+6.1.3.3          Fields
+6.1.3.4          Methods
+6.1.3.5          Constructors
+6.1.3.6          Destructors
+6.1.4         Scope of Entities Defined in a Class
+6.1.5         Deferred Class Definitions
+6.2        Kinds of Classes
+6.2.1         Concrete classes
+6.2.2         Abstract classes
+6.2.3         Property classes
+6.2.4         The Underlying Type Model
+6.2.5         Class Views
+6.3        Inheritance
+6.3.1         The Root Class
+6.3.2         Multiple Inheritance
+6.3.3         Name Conflicts
+6.3.4         Overriding
+6.3.5         Abstract Methods, Constructors, and Destructors
+6.4        Syntax
+6.5        Object Access
+6.5.1         The Object Model
+6.5.2         Implicit Parameter Self
+6.5.3         Polymorphism during Construction and Destruction
+6.5.4         Implicit References
+6.5.5         Field References
+6.5.6         Inherited
+6.5.7         Reference Type Coercion
+6.5.8         Operations
+6.5.8.1          Compatibility Rules
+6.5.8.2          Activation of Methods
+6.5.8.3          Activation of Constructors
+6.5.8.4          Activation of Destructors
+6.5.8.5          Assignment
+6.5.8.6          Comparison
+6.5.8.7          Parameter Passing
+6.5.8.7.1            Value Parameters
+6.5.8.7.2            Variable Parameters
+6.5.8.8          Membership Operator Is
+6.6        Predefined Entities
+6.6.1         Null
+6.6.2         Root
+6.6.2.1          Create
+6.6.2.2          Destroy
+6.6.2.3          Clone
+6.6.2.4          Equal
+6.6.3         TextWritable
+6.6.3.1          ReadObj
+6.6.3.2          WriteObj
+6.6.4         Copy
+6.7        Signatures
+6.8        With Statement
+6.9        Procedure, Function, Constructor, and Destructor Declarations
+6.10       Changes to Export Clause
+6.11       Visibility
+6.12       Extended Pascal Features
+6.13       Suggested Changes to Extended Pascal
+
+Appendixes
+       A   Collected BNF
+       B   Non-Syntactic Changes to the Extended Pascal Standard
+       C   Separated Issues
+       D   Language Features Considered and Rejected
+       E   Rationale for Decisions Reflected in this Report
+
+
+                               Introduction
+                               ------------
+
+The following people participated in the development of this Technical
+Report on Object-Oriented Extensions to Pascal.
+
+Joseph Bergin                                 Jim Miner
+   Pace University                               University of Minnesota
+
+Pete Boton, CCP                               Joseph Mouhanna
+   Atlantic Computing                            Microsoft
+
+Klaus Daesler                                 David Neal
+   Siemens Nixdorf                               Symantec
+
+Peter Goetz                                   Bill Price
+   Siemens Nixdorf                               Unisys Corp.
+
+Tony Hetherington                             John Reagan
+   Prospero Software Ltd.                        Digital Equipment Corp.
+
+David Intersimone                             Kurt Schmucker
+   Borland International                         Apple Computer Inc.
+
+Jay Joiner                                    Michael Stinson
+   U.S. Air Force                                Central Michigan University
+
+David Joslin                                  Damian Thomas
+   University of Teesside                        Unisys Corp.
+
+Charles Linett                                Thomas Turba
+   Census Bureau                                 Unisys Corp.
+
+Donal MacVeigh                                Derek White
+   St. Peter's College                           Apple Computer Inc.
+
+Matt Miller
+   Unisys Corp.
+
+The officers of the committee at the time the report was sent to X3 are:
+
+Thomas N. Turba                   John R. Reagan                Pete Boton, CCP
+   Chairman                          Secretary                     Technical
+                                                                   Editor
+
+
+1. Scope. This report describes the semantics and syntax for object-oriented
+extensions to the Pascal and Extended Pascal programming languages.
+
+       NOTE: While this report is not a standard, implementors are strongly
+       encouraged to conform to this report. It is expected that the
+       information herein will be incorporated into the next revisions of
+       the applicable standards.
+
+2. References. The following publications are used in conjunction with this
+report:
+
+       ISO/IEC 7185:1990
+           Programming Language Pascal
+
+       ANSI/IEEE770X3.160-1989, ISO/IEC 10206:1991
+           Programming Language Extended Pascal
+
+3. Definitions. The definitions of Dynamic-Violation, Error, Extension,
+Implementation-Defined, Implementation-Dependent, and Processor in the
+Extended Pascal standard apply to this Technical Report.
+
+4. Definition Conventions. The definitions of in and containing, and the
+metalanguage used in this Technical Report to specify the syntax of
+constructs, are the same as those defined in the Pascal and Extended Pascal
+standards.
+
+5. Compliance. A processor or program shall be said to comply with this
+Technical Report if it complies with the features described in this report
+in the manner specified under Compliance in the Pascal and Extended Pascal
+standards.
+
+6. Object Extensions. The extensions described in this section are described
+in terms of, and based on, the standard for the programming language
+Extended Pascal. Except for the Extended Pascal features listed in Section
+6.12, they apply equally well to the programming language Pascal.
+
+6.1 Class Definition. A class definition defines the common structure and
+set of services for a group of objects.
+
+6.1.1 Extension of the Type System. Class definitions are integrated with,
+and an extension of, the existing Pascal type system. The affected
+production in the Extended Pascal standard is:
+
+       type-definition = identifier "="
+                         ( type-denoter | class-type-denoter ).
+
+6.1.2 Restrictions on Class Definitions. A class definition can appear only
+in a type-definition-part in a program-block, module-heading, or
+module-block. Therefore, it cannot appear within a procedure, function,
+constructor, or destructor declaration.
+
+6.1.3 Contents and Basic Structure of Class Definition. A class definition
+specifies:
+
+(a)    The name of the class;
+
+(b)    The kind of class;
+
+(c)    Inheritance for the class;
+
+(d)    Fields that each object of the class will contain;
+
+(e)    Headers for methods that will provide services for objects in
+       the class; and
+
+(f)    Headers for constructors and destructors for objects of the class.
+
+Fields, methods, constructors, and destructors can appear in any order
+within a class definition. The specification of the bodies of methods,
+constructors, and destructors is done separately from the class definition.
+(See sections 6.1.3.4, 6.1.3.5, and 6.1.3.6.)
+
+The basic structure of a class definition is:
+
+       TYPE
+            name = [ kind ] CLASS [ inheritance list ]
+                   { definition of structure and contents }
+                   END;
+
+       NOTE: The above "syntax" and following similar representations are
+       informal and do not show the complete syntactic structure. The
+       complete syntactic structure is presented in EBNF in section 6.4.
+
+6.1.3.1 Kind of Class. A class is either a concrete class, an abstract
+class, or a property class.
+
+A concrete class begins with the word symbol class, an abstract class begins
+with abstract class, and a property class begins with property class. For
+example:
+
+       TYPE
+         Printable = PROPERTY CLASS
+                     ...
+                     END;
+
+         List      = CLASS (Printable)
+                     ...
+                     END;
+
+The semantics for these classes are described in section 6.2.
+
+6.1.3.2 Inheritance List. The word symbol class can be followed by a
+parenthesized list of class names:
+
+       TYPE
+         Student = CLASS (Person, Gradable, ... )
+                   ...
+                   END;
+
+These class names, if present, specify classes from which this class
+inherits fields, methods, constructors, and destructors. No class name can
+appear more than once in the list. The order in which the class names appear
+in the list has no semantic significance.
+
+6.1.3.3 Fields. A field definition in a class defines a data item that
+exists in each instance of the class. It is similar to a field of a record.
+For example:
+
+       TYPE
+         Person = CLASS
+                    Name        : ^ String;
+                    DateOfBirth : DateType;
+                  END;
+
+If a field of a class has restrictions associated with it (if it is a file
+type, for example), then the class type also has these restrictions.
+
+6.1.3.4 Methods. A method is a procedure or function that provides a service
+(or operation) for the objects of the class. A method is always activated
+for a specific object of the class.
+
+Methods are declared within the definition of a class. For example:
+
+       TYPE
+         Employee = CLASS (Person)
+                      PROCEDURE Pay;
+                      FUNCTION  Salaried : Boolean;
+                    END;
+
+A class definition contains the heading for each method in the class.
+Methods can optionally be marked with abstract or override.
+
+6.1.3.5 Constructors. A constructor defines actions that are performed when
+an object is created. A class definition can contain zero or more
+constructors.
+
+There is a predefined constructor called Create in the Root class. Since
+every abstract class and every concrete class is a descendant of Root, every
+such class has at least one constructor.
+
+Constructors are declared within the definition of a class. For example:
+
+       TYPE
+         ListNode = CLASS (parent, ...)
+                      ...
+                      CONSTRUCTOR Create; Override;
+                      ...
+                    END;
+
+If a class inherits non-abstract constructors from more than one parent, a
+non-abstract constructor must be specified in this class. Overriding an
+inherited constructor is sufficient.
+
+Constructors can be defined for any class, including abstract classes and
+property classes.
+
+       NOTE: A constructor defined in a property class can be called only
+       from a constructor of a descendant.
+
+A constructor can have zero or more parameters. Like a method, only the
+heading of a constructor appears in a class definition.
+
+6.1.3.6 Destructors. A destructor removes an object from a class and
+performs any other user-specified actions associated with the removal of the
+object. A class definition can contain zero or more destructors.
+
+There is a predefined destructor called Destroy in the Root class. Since
+every abstract class and every concrete class is a descendant of Root, every
+such class has at least one destructor.
+
+Destructors are declared within the definition of a class. For example:
+
+       TYPE
+         ListNode = CLASS (parent, ...)
+                      ...
+                      DESTRUCTOR Destroy; Override;
+                      ...
+                    END;
+
+Destructors can be defined for any class, including abstract classes and
+property classes.
+
+       NOTE: A destructor defined in a property class can be called only
+       from a destructor of a descendant.
+
+A destructor can have zero or more parameters. Like a method, only the
+heading for a destructor appears in a class definition.
+
+6.1.4 Scope of Entities Defined in a Class. The scope rules in section 6.2.2
+of the Extended Pascal standard are extended for classes in a manner similar
+to that for records. Simply stated, all identifiers defined in a class are
+local to that class.
+
+6.1.5 Deferred class definitions. A class name can be declared before its
+structure and contents are defined. This is specified by:
+
+       TYPE
+         name = [ kind ] CLASS .. END;
+
+       NOTE:  In the above, ".." is a symbol.
+
+Later in the same type-definition-part, there must be a type definition with
+the same name that specifies the contents and structure of the class. A
+class cannot be used in a class-inheritance-list before its complete
+definition is specified.
+
+6.2 Kinds of Classes.
+
+6.2.1 Concrete Classes. A concrete class is the only kind of class for which
+an object can be created.
+
+Any class that is not explicitly declared to be an abstract class or a
+property class is concrete.
+
+A class cannot be concrete if it possesses any abstract methods,
+constructors, or destructors.
+
+6.2.2 Abstract Classes. An abstract class is a place holder in a class
+hierarchy. It defines protocol and common contents for descendant classes.
+An object cannot be created for an abstract class.
+
+An abstract class is specified by including the word symbol abstract in the
+class definition. For example:
+
+       TYPE
+         Collection = ABSTRACT CLASS (Root)
+                        PROCEDURE Insert (Element : Root);
+                                                        ABSTRACT;
+                        ...
+                      END;
+
+6.2.3 Property Classes. A property class provides a characteristic,
+attribute, or property for the definition of another class. For example,
+such a property may be that objects in the class are printable, that they
+have magnitude, or that they are storable.
+
+A property class cannot be instantiated. It is used via inheritance, perhaps
+along with other property classes, by an abstract or concrete class. Thus,
+an object always belongs in a unique concrete class and can have any number
+of inherited property classes.
+
+An object can be tested to see whether or not it has a property. (This is
+accomplished using the is operator, described in section 6.5.8.8.)
+
+A property class is specified by including the word symbol property in the
+class definition:
+
+       TYPE
+         Magnitude = PROPERTY CLASS
+                       FUNCTION Less (Element : Magnitude) :
+                                               Boolean; ABSTRACT;
+                       ...
+                     END;
+
+A property class can inherit only from other property classes. It does not
+inherit from the Root class (described in section 6.3.1), but from a forest
+of independently rooted trees. A property class can inherit from any number
+of other property classes as long as it does not directly or indirectly
+inherit either from itself or from two or more property classes that have a
+common ancestor.
+
+6.2.4 The Underlying Type Model. A class-type-name denotes a class-type
+whose structure is a pair consisting of a reference-type and an object-type.
+
+The reference-type specifies which features are visible via a reference of
+that type. A reference variable, parameter, or function result type is
+statically associated with this reference-type in a declaration of a
+reference variable, parameter, or function respectively. The reference-type
+references objects of the object-type. The reference-type of the class-type
+is the type of references to objects in the class.
+
+The object-type of the class-type defines the type given to objects when
+they are constructed as a consequence of applying a constructor of the class
+to the specified class name. The object-type specifies the structure of the
+object and all of its features, whether visible or not.
+
+In a subclass definition, a new reference-type and a new object-type are
+created. The object-type has all of the features inherited from all of the
+object-types of all of its ancestors, whether visible or not, and all
+features added in this class definition itself. The reference-type has all
+of the visible features of its ancestors and all features added by the class
+definition.
+
+An object is a member of its object-type and all ancestors of its
+object-type. An object is a member of a class if it is a member of the
+object-type of the class. Class-types that have the same object-type are
+assignment-compatible.
+
+6.2.5 Class Views. A class view defines a new class-type whose
+reference-type is a partially opaque type that is based on an existing
+class-type. A view of a class specifies which features of the base type will
+be visible in the view. For example:
+
+       TYPE
+         PublicList = VIEW OF List (PublicCollection)
+                        PROCEDURE InsertFirst (Element : Root);
+                        ...
+                      END;
+
+defines a new class called PublicList that is based on the class List. All
+of the visible features of List that are in PublicCollection together with
+InsertFirst are visible in PublicList.
+
+Class views have the following properties:
+
+(a)    A class view defines a class.
+
+(b)    The kind of class defined (concrete, abstract, or property) is the
+       same as the view-base-type.
+
+(c)    The classes named in the class-inheritance-list of a
+       class-definition-part of the class-view-denoter shall be ancestors or
+       views of ancestors of the view-base-type.
+
+(d)    The class defined by a view has as its only visible properties those
+       properties specified through the class-inheritance-list and the
+       class-definition-part.
+
+(e)    The features named in the class-definition-part of the
+       class-view-denoter must be visible features of the class named by the
+       view-base-type.
+
+(f)    All names visible in the classes named in the class-inheritance-list
+       of the class-definition-part of the class-view-denoter are features
+       of the view-base-type.
+
+(g)    Feature names in the class view definition cannot be marked override.
+
+       NOTES:
+
+       (1) In a class-view-denoter, new features cannot be introduced and
+       methods cannot be overridden.
+
+       (2) A class view is a class. Therefore, a view can itself be viewed.
+       A view can also be named in a class-inheritance-list of a
+       class-definition-part. (See 6.2.4.)
+
+In a class-view-denoter, a new reference-type is created but not a new
+object-type. The object- type of the view-base-type is the object-type of
+the viewed class (even if a view is viewing another view).
+
+The reference-type created has all of the visible features of the
+reference-types of the classes named in the class-inheritance-list together
+with all features individually listed in the view. NOTES:
+
+       (1) When an object is created, its type is the object-type. This is
+       independent of any reference-type and hence is independent of any
+       visibility restrictions. Visibility restricts the access to features
+       of an object and does not affect the nature or capability of the
+       object itself. If two views of an object are visible within a scope,
+       then references having these types can be assigned to one another.
+       They can appear to have different capabilities because they have
+       different interfaces via their references.
+
+       (2) A view class can be used to restrict access to an object. To do
+       this, it is necessary to export the view while not exporting a wider
+       view of the same class of objects. In most cases, for a view to be
+       useful it will contain at least one constructor (and usually at least
+       one destructor).
+
+       (3) The "top view" of a class is the view in which the set of
+       features of the reference-type is identical to the set of features of
+       the object-type. (Roughly, if the class structure has been defined
+       entirely without the use of views.) Since a subclass can be created
+       by naming a view as a parent class, a top view of objects in the
+       class may not exist in the program. This is, however, the view that
+       the object has of itself.
+
+       (4) If a visible method references a method or field within its body,
+       its behavior is the same, regardless of the visibility of that entity
+       in the calling environment.
+
+6.3 Inheritance.
+
+Inheritance is a means of defining a class that is an extension or
+refinement of another class. A class definition that contains a
+class-inheritance-list specifies a class that inherits from each of the
+class names specified in the class-inheritance-list.
+
+A class that directly inherits from another class is called a "child" of
+that other class. The class from which it directly inherits is called a
+"parent." A class that inherits (directly or indirectly) from another class
+is called a "subclass" or "descendant" of that other class. The class from
+which it inherits (directly or indirectly) is called an "ancestor."
+
+A class cannot have itself as an ancestor, inherit two or more times from
+the same class, or inherit from two classes with a common ancestor.
+
+As an implicit part of its definition, a descendant class contains the
+definitions of all fields, methods, constructors, and destructors of each of
+its ancestor classes.
+
+A class that is a descendant of another class can add definitions for new
+fields, methods, constructors, and destructors to those it inherits. It can
+also override inherited methods, constructors, and destructors, thereby
+associating new bodies with these entities. However, it cannot remove the
+definition of an entity defined in an ancestor class, nor can it modify the
+signature of any method, constructor or destructor, or the type of any
+field. (Signatures are described in section 6.7.)
+
+6.3.1 The Root class.
+
+A predefined abstract class called Root is an ancestor of every abstract and
+every concrete class, whether or not it is specified in a class inheritance
+list. The contents of Root are described in detail in section 6.6.2.
+
+If a concrete or abstract class does not explicitly inherit from another
+concrete or abstract class, it inherits only from the Root class.
+
+6.3.2 Multiple Inheritance.
+
+Multiple inheritance in a class definition has the following properties:
+
+(a)    A class defined using multiple inheritance is a descendant of each of
+       the classes from which it inherits. It contains all fields, methods,
+       constructors, and destructors of each of its parents.
+
+(b)    There cannot be a common ancestor in the hierarchy for the parents of
+       a class defined using multiple inheritance. A class can inherit only
+       from independently rooted trees. Thus, a class can have several
+       parent property classes if they come from separately rooted trees.
+       (See 6.2.3.)
+
+       NOTE: At most one class in the class-inheritance-list for the
+       definition of a class-type can be an abstract class or a concrete
+       class. Zero or more classes in the class-inheritance-list can be
+       property classes.
+
+6.3.3  Name Conflicts.
+
+A new entity defined in a class cannot have the same spelling as the name of
+any ancestor or any inherited entity.
+
+An overriding method, constructor, or destructor has the same name as its
+corresponding entity defined in an ancestor.
+
+If multiple inheritance is used in the definition of a class, the spellings
+of all inherited names must be distinct.
+
+6.3.4  Overriding.
+
+Overriding is the redefinition of the implementation of a visible inherited
+method, constructor, or destructor.
+
+The directive Override indicates that an inherited entity is being
+overridden. The directive Override follows the definition of the heading for
+the entity:
+
+           FUNCTION Name : Result; Override;
+
+Override must be specified in the heading for an entity that defines the
+implementation of an inherited abstract entity.
+
+The heading for an overriding entity must be of the same kind (procedure,
+function, constructor, or destructor) as the heading for the entity it is
+overriding. The heading for an overriding method, constructor, or destructor
+may optionally specify its parameter list and return type. If specified, the
+signature of an overriding method, constructor, or destructor must be the
+same as the signature of the original entity. Therefore, an overriding
+method, constructor, or destructor cannot change the type of a parameter or
+result. (Signatures are described in section 6.7.)
+
+6.3.5 Abstract Methods, Constructors, and Destructors. A class does not
+define an implementation for an abstract entity. It defines only the
+interface. The implementation is deferred to a descendant class.
+
+An abstract entity can be defined only in an abstract class or a property
+class.
+
+A non-abstract entity that is defined in a parent class cannot later be
+declared abstract in a descendant class.
+
+An entity is defined to be abstract if the word symbol abstract follows the
+definition of its heading in a class definition. For example:
+
+       PROCEDURE Draw; ABSTRACT;
+
+6.4 Syntax. The following productions define the syntax for the preceding
+sections.
+
+       type-definition = identifier "="
+                         ( type-denoter | class-type-denoter ) .
+
+       class-type-denoter = subclass-denoter |
+                            class-view-denoter .
+
+       subclass-denoter = property-class | abstract-class |
+                          concrete-class .
+
+       class-view-denoter = "view" "of" view-base-type
+                            class-definition-part .
+
+       view-base-type = class-type-name .
+
+       class-type-name = type-name .
+
+       property-class = "property" "class"
+                        class-definition-part .
+
+       abstract-class = "abstract" "class"
+                        class-definition-part .
+
+       concrete-class = "class" class-definition-part .
+
+       class-definition-part = ( actual-class-definition |
+                                 deferred-class-definition )
+                               "end" .
+
+       deferred-class-definition = ".." .
+
+       actual-class-definition = [ class-inheritance ]
+                                 [ class-component-list ] .
+
+       class-inheritance = "(" class-inheritance-list ")" .
+
+       class-inheritance-list = class-type-name
+                                { "," class-type-name } .
+
+       class-component-list = class-component
+                              { ";" class-component } [ ";" ] .
+
+       class-component = class-field-item |
+                         class-procedural-item
+                         [ ";" ( override-directive |
+                                 "abstract"          ) ] .
+
+       class-field-item = variable-declaration .
+
+       class-procedural-item = procedure-heading |
+                               function-heading |
+                               constructor-heading |
+                               destructor-heading .
+
+       constructor-heading = "constructor" identifier
+                             [ formal-parameter-list ] .
+
+       destructor-heading = "destructor" identifier
+                            [ formal-parameter-list ] .
+
+6.5  Object Access.
+
+6.5.1 The Object Model. The object model is a reference model. In this
+model, objects can be thought of as if they were accessed indirectly through
+references. A variable or field that is of a class-type refers to an object
+or has the value Null. The object model has the following properties:
+
+(a)    An object is an entity of a class-type.
+
+(b)    An object is created by a constructor.
+
+(c)    Each object possesses a type. This type is the type of the class
+       through which its constructor is called.
+
+(d)    The components of an object are the fields, methods, constructors,
+       and destructors defined for the object-type of the class type,
+       whether visible or not.
+
+(e)    An object is always accessed through a reference.
+
+(f)    A reference to an object is a value.
+
+(g)    A reference can be attributed to a variable or returned by a
+       function.
+
+(h)    There is a one-to-one relationship between non-null reference values
+       and objects.
+
+(i)    A variable of a class type either refers to an object or has the
+       value Null.
+
+(j)    A variable of a class type can be assigned a reference to an object
+       of the variable's type, any descendant of that type, or any type that
+       has the same object-type as the variable's type.
+
+(k)    A variable of a property class type can be assigned a reference to an
+       object that has that property.
+
+(l)    An expression yielding a reference to an object can be coerced to a
+       specified class type. It shall be a dynamic-violation if the type of
+       the object is not the object-type of the specified type or a
+       descendant of the specified type.
+
+(m)    Activation of a method for an object always activates the method
+       determined by the type of the object, regardless of the type of the
+       reference.
+
+       NOTES:
+
+       (1) All objects reside in an implementation-defined area that could
+       be the heap.
+
+       (2) An implementation is free to use any appropriate mechanism to
+       implement the object model. It may or may not choose to use pointers;
+       and, an implementation can change from one release to another as to
+       how references are implemented.
+
+       (3) An implementation can have a garbage collector for objects if it
+       so chooses. The presence or absence of a garbage collector cannot
+       change the semantics of a correct program.
+
+6.5.2  Implicit Parameter Self.
+
+Within the declaration of a method, constructor, or destructor, the
+identifier Self conceptually represents an implicit protected parameter. At
+its point of introduction, Self references the object for which the method,
+constructor, or destructor was activated.
+
+6.5.3  Polymorphism during Construction and Destruction.
+
+Within a constructor or destructor, the object referenced by Self is
+considered to be an object of the type for which the constructor or
+destructor was defined. Because an object being constructed or destroyed is
+inherently incomplete, features defined by a subclass of the class in which
+the constructor or destructor is defined are inaccessible within the
+activation of the constructor or destructor. Therefore, if a method defined
+at this level is overridden in a subclass, the overriding method will be
+inaccessible during the activation of the constructor or destructor.
+
+       NOTE: The above implies that the type of the object being created or
+       destroyed will conceptually change when executing a constructor or
+       destructor at a different level in the hierarchy, and that this
+       change will be in effect for any methods activated from within such a
+       constructor or destructor.
+
+6.5.4  Implicit References.
+
+Within the definition of a method, constructor, or destructor, the names of
+fields, methods, constructors, and destructors defined in the class to which
+it belongs are visible.
+
+A reference to a field, method, or destructor without an explicit object
+reference is a reference to the implicit protected parameter Self unless a
+with statement applies. The visibility of implicit references begins with
+the class name that precedes the method, constructor, or destructor name in
+the declaration. Therefore, a parameter identifier or local variable with
+the same spelling as a name brought in will hide the name brought in. A name
+so hidden can be accessed by explicit use of the class name and
+qualification.
+
+6.5.5  Field References.
+
+The visible fields of an object are referenced via a field-designator. The
+syntax for field-designator in Extended Pascal is changed as follows:
+
+       field-designator = [ object-reference "." ]
+                                       class-field-specifier |
+                          record-variable "." field-specifier |
+                          field-designator-identifier .
+
+       class-field-specifier = field-specifier .
+
+A class-field-specifier that is not preceded by an object-reference can
+appear only in a method, constructor, destructor, or with statement.
+
+It shall be a dynamic violation if the object-reference in field-designator
+denotes the value Null.
+
+6.5.6  Inherited.
+
+Inherited indicates that name resolution for the method, constructor, or
+destructor begins in the parent (or parents) of the class of the method,
+constructor, or destructor in which inherited appears. Example:
+
+       INHERITED Draw (1, 6);
+
+Inherited can be used only within the declaration of a method, constructor,
+or destructor. Inherited cannot be used in conjunction with an explicit
+reference to a parent. For example:
+
+       Parent_Name . INHERITED Size
+
+is illegal.
+
+Inherited can be used with Self by specifying:
+
+       INHERITED Self . Method_Name
+
+The above has the same meaning as
+
+       INHERITED Method_Name
+
+6.5.7  Reference Type Coercion.
+
+A reference to an object can be coerced to have the reference type of any of
+its descendants.
+
+       variable-access = entire-variable | component-variable |
+                         identified-variable | buffer-variable |
+                         substring-variable |
+                         function-identified-variable |
+                         reference-coercion .
+
+       reference-coercion = class-type-name
+                                       "(" variable-access ")" .
+
+A reference-coercion returns a reference to an object.
+
+It will be a run-time error if the object referenced by the variable-access
+of a reference-coercion is not a member of the class-type-name specified in
+the reference-coercion.
+
+Using APerson as a variable name for an object of type Person, and Student
+as a descendant type of Person, a use would appear as:
+
+       Student ( APerson ) . Grade_Point_Average
+
+6.5.8  Operations
+
+6.5.8.1  Compatibility Rules.
+
+The compatibility of class-types is determined by the following rules, which
+are extensions to the compatibility rules in the Extended Pascal standard.
+
+Section 6.4.5 of the Extended Pascal standard is extended with a new rule
+stating that types T1 and T2 are compatible if
+
+       (e) T1 and T2 are class-types.
+
+For assignment compatibility of objects within a class hierarchy, Section
+6.4.6 of the Extended Pascal Standard is extended with a new rule stating
+that a value of type T2 is assignment-compatible with a type T1 if
+
+       (g) T1 and T2 are class-types and the object type of T2 is the same
+       as, or a descendant of, the object type of T1; or
+
+       (h) T1 is a property class and T2 has that property.
+
+6.5.8.2  Activation of Methods.
+
+A method is activated by reference to an object and a method name associated
+with the class of the object. The syntax for method activation is:
+
+       method-activation =
+           [ "inherited" [ self-reference "." ] |
+             object-reference "." |
+             ancestor-name "." ]
+           method-identifier [ actual-parameter-list ] .
+
+       self-reference = self-identifier .
+
+       self-identifier = identifier .
+
+       ancestor-name = class-type-name .
+
+       method-identifier = identifier .
+
+       object-reference = variable-access | function-access .
+
+The identifier in self-reference is the implicit protected parameter Self.
+
+A method activation that begins with the word symbol inherited, or that
+begins with an ancestor-name, can appear only in the body of a method,
+constructor, or destructor. The object used with such an activation is the
+object represented by the implicit protected parameter Self.
+
+It will be a run-time error if the object-reference in method-activation
+denotes the value Null.
+
+Method-activation is added as an alternative in procedure-statement and
+primary.
+
+6.5.8.3  Activation of Constructors.
+
+A constructor is called as either a function (constructor-access) or a
+procedure (constructor-statement). Constructor-statement is added as an
+alternative in simple-statement. Constructor-access is added as an
+alternative in primary.
+
+       constructor-statement =
+              ( "inherited" | ancestor-name "." )
+              constructor-identifier [ actual-parameter-list ] .
+
+       constructor-identifier = identifier .
+
+       constructor-access = class-type-name "."
+             constructor-identifier [ actual-parameter-list ] .
+
+A constructor-access returns a reference to a newly created object that is
+of the object type of the class. When an object is created, the following
+actions are performed (in order):
+
+(a)    The initial states that are specified for any fields are set. This is
+       done in an implementation-dependent order.
+
+(b)    The user-specified actions of the constructor are executed. Example:
+
+       Reference := Person . Create;
+
+       creates an object of type Person.
+
+A constructor-statement calls a constructor for an ancestor type to
+initialize that portion of the object that was defined by that ancestor. A
+constructor typically begins by calling constructors for each of its
+parents.
+
+A constructor-statement can appear only in the body of a constructor. It
+does not create a new reference.
+
+       NOTE: Conceptually, the type of the object being created changes when
+       executing a constructor at different levels in the hierarchy. This
+       change will be in effect for any methods activated from within such a
+       constructor.
+
+If a constructor contains a goto statement that transfers control out of
+that constructor, the state of the object being constructed will be
+undefined if that statement is executed.
+
+6.5.8.4 Activation of Destructors. A destructor removes an object from a
+class. A destructor-statement is added as an alternative in
+simple-statement.
+
+       destructor-statement =
+            [ "inherited" [ self-reference "." ] |
+              object-reference "." |
+              ancestor-name "." ]
+            destructor-identifier [ actual-parameter-list ] .
+
+       destructor-identifier = identifier .
+
+       NOTE: Since destructors are called explicitly by the user, the order
+       of application is user-controlled.
+
+A destructor activation that begins with the word symbol inherited, or that
+begins with an ancestor-name, can appear only in the body of a destructor.
+
+The object used with such an activation is the object represented by the
+implicit protected parameter Self.
+
+It will be a run-time error if the object-reference in destructor-statement
+denotes the value Null.
+
+Selection of a destructor is always to the most specific for the object
+being referenced.
+
+       NOTE: If a system provides a garbage collector, activation of a
+       destructor need not immediately reclaim storage for the object, but
+       the object should no longer be accessible.
+
+A destructor activation inside a destructor applied to the value denoted by
+the implicit protected parameter Self shall be called a "continuing
+destructor activation". An object shall be said to be destroyed if a
+destructor is executed for that object and the destructor activation is not
+a continuing destructor activation. It shall be an error to reference an
+object after it has been destroyed.
+
+Upon completion of a destructor-statement in which an object reference
+occurs, the reference value of the object-reference is removed from all
+types of which it is a member.
+
+       NOTE: Conceptually, the type of the object being destroyed changes
+       when executing a destructor at a different level in the hierarchy.
+       This change will be in effect for any methods activated from within
+       such a destructor.
+
+If a destructor contains a goto statement that transfers control out of that
+destructor, the state of the object being destroyed will be undefined if
+that statement is executed.
+
+6.5.8.5 Assignment. Assignment attributes a (possibly Null) reference value
+to a variable of a class-type.
+
+6.5.8.6 Comparison. The relational operators "=" and "<>" can be used with
+reference values. The result of the "=" operator is true if both operands
+contain the value represented by Null or both are references to the same
+object; otherwise, it is false. "<>" is the logical negation of "=".
+
+6.5.8.7 Parameter Passing. Objects and fields of objects can be passed as
+both value and variable parameters. Methods, constructors, and destructors
+cannot be passed as procedural parameters.
+
+6.5.8.7.1 Value Parameters. For value parameters, a copy of the reference
+variable is created to be passed as the actual parameter. The actual
+parameter for a value parameter must be assignment-compatible with the
+formal parameter.
+
+6.5.8.7.2 Variable Parameters. If a variable parameter is of a class type,
+the variable used as the actual parameter for the variable parameter must be
+of the same type as the formal parameter. The actual object referenced by
+the variable may be of a descendant type.
+
+6.5.8.8 Membership Operator Is. The word symbol is is a Boolean operator
+with two operands. The left operand is an object and the right operand is a
+class name. If the object is a member of the class specified by the right
+operand, is returns the value True; otherwise, it returns the value False.
+
+The production for factor is extended as follows:
+
+       factor = primary [ exponentiating-operator primary |
+                          "is" type-identifier ] .
+
+6.6 Predefined Entities. The following entities and their associated
+identifiers are predefined.
+
+6.6.1 Null. The predefined constant identifier Null represents a
+distinguished value that is assignment-compatible with any variable of a
+class type. The value represented by Null can be used in the initial state
+specifier of a class type. Null is analogous to the pointer value Nil.
+
+6.6.2 Root. The predefined identifier Root represents an abstract class that
+is the parent of all user-defined concrete and abstract classes. The Root
+class has as its interface the methods that are specified in the following
+subsections. The Root class is defined as follows:
+
+       TYPE
+         Root = ABSTRACT CLASS
+                  CONSTRUCTOR Create;
+                  DESTRUCTOR  Destroy;
+                  FUNCTION    Clone : Root;
+                  FUNCTION    Equal (R : Root) : Boolean;
+                END;
+
+       NOTE: An implementation can add other things to the class Root.
+
+6.6.2.1 Create. Create is a constructor with no parameters. Its action is to
+create an object of the class in which it is used. When overridden, the
+programmer can specify additional actions to be taken after creation.
+
+6.6.2.2 Destroy. Destroy is a destructor with no parameters. Its action is
+to destroy the object. When overridden, the programmer can specify
+additional actions to be taken before the object is destroyed.
+
+6.6.2.3 Clone. Clone is a functional method without parameters. It returns
+the result of the predefined function Copy.
+
+       NOTE: The recommended method of redefining Clone is to specify
+       inherited Clone as the first operation in the overriding method. This
+       way, the clone is built in a top-down fashion.
+
+6.6.2.4 Equal. Equal is a functional method that compares two reference
+values. It has one parameter: a reference to an object. If not overridden,
+its action is to return True if the parameter is a reference to the same
+object as Self; otherwise, it returns False.
+
+6.6.3 TextWritable. TextWritable is a predefined property class that has the
+following interface:
+
+       TYPE
+         TextWritable = PROPERTY CLASS
+                          PROCEDURE ReadObj (VAR F : Text);
+                          PROCEDURE WriteObj (VAR F : Text);
+                        END;
+
+6.6.3.1 ReadObj. ReadObj is a procedural method. It takes one parameter: a
+text file from which an object is to be read. If not overridden, ReadObj
+simply returns, performing no other actions. It is intended to be overridden
+in descendant classes.
+
+6.6.3.2 WriteObj. WriteObj is a procedural method. It takes one parameter: a
+text file to which an object is to be written. If not overridden, WriteObj
+simply returns, performing no other actions. It is intended to be overridden
+in descendant classes.
+
+6.6.4 Copy. The predefined identifier Copy represents a function that has
+one argument, a reference to an object. It returns a reference to a new
+object of the same object-type. This new object is a field-by-field copy of
+the original object.
+
+6.7 Signatures. The signatures of two functions, procedures, constructors,
+or destructors shall be said to be the same if and only if:
+
+(a)    Both are functions, both are procedures, both are constructors, or
+       both are destructors;
+
+(b)    Their formal-parameter-lists are congruous (See section 6.7.3.6 of
+       the Extended Pascal standard for a definition of congruity);
+
+(c)    The spelling of corresponding parameter identifiers in both lists is
+       the same; and
+
+(d)    In the case of functions, the type, bindability, and initial state of
+       the result type are the same; and if one function definition contains
+       a result variable specification, then the other also has a result
+       variable specification of the same spelling.
+
+       NOTE: It is anticipated that when the Extended Pascal standard is
+       revised that signatures will be used to allow the respecification of
+       the parameter list for a forward procedure or function and for the
+       specification of procedure and function headings in the
+       implementation part of modules.
+
+6.8 With Statement. The with statement opens visibility into the visible
+fields, methods, and destructors of the specified object.
+
+6.9 Procedure, Function, Constructor, and Destructor Declarations. To allow
+for the declaration of methods, constructors, and destructors, the syntax
+for procedure-identification and function-identification is changed, and new
+productions for constructor-identification and destructor-identification are
+added to the syntax.
+
+These changes allow for the class name and "." to precede the procedure,
+function, constructor, or destructor name, and for the override directive to
+follow any of these identifications.
+
+       procedure-identification =
+               "procedure" [ class-type-name "." ]
+               procedure-identifier [ formal-parameter-list ]
+               [ ";" override-directive ] .
+
+       function-identification =
+               "function" [ class-type-name "." ]
+               function-identifier [ formal-parameter-list ]
+               [ result-variable-specification ]
+               [ ":" result-type ]
+               [ ";" override-directive ] .
+
+       constructor-identification =
+               "constructor" [ class-type-name "." ]
+               constructor-identifier [ formal-parameter-list ]
+               [ ";" override-directive ] .
+
+       destructor-identification =
+               "destructor" [ class-type-name "." ]
+               destructor-identifier [ formal-parameter-list ]
+               [ ";" override-directive ] .
+
+       override-directive = identifier .
+
+The identifier in the override-directive has the spelling "override".
+
+The production for procedure-and-function-declaration-part is expanded to
+include alternatives for constructor-declaration and destructor-declaration.
+
+       procedure-and-function-declaration-part =
+                   { ( procedure-declaration |
+                       function-declaration |
+                       constructor-declaration |
+                       destructor-declaration ) ";" } .
+
+The declarations for the new productions are:
+
+       constructor-declaration = constructor-identification ";"
+                                 procedure-block .
+
+       destructor-declaration = destructor-identification ";"
+                                procedure-block .
+
+If parameters or a result type is specified for a procedure, function,
+constructor, or destructor, the declaration must have the same signature as
+its declaration in the class.
+
+If a class is defined in a module, the declarations for the methods,
+constructors, and destructors for that class must appear in the
+implementation part for that module.
+
+6.10 Changes to Export Clause. The export-clause in Extended Pascal is
+changed so that an exported class can be tailored to avoid name conflicts.
+In effect, modules can be used as software adapters (just like hardware
+adapters) to permit the use of possibly clashing software libraries.
+
+The syntax for the extensions is:
+
+       export-clause = ( exportable-name |
+                         export-renaming-clause )
+                       [ '[' exportable-feature-list ']' ] .
+
+       exportable-feature-list = exportable-feature-renaming
+                           { "," exportable-feature-renaming } .
+
+       exportable-feature-renaming = feature-name "=>"
+                                     identifier .
+
+       feature-name = field-identifier | method-identifier |
+                constructor-identifier | destructor-identifier .
+
+If the export-clause contains an exportable-feature-list, the
+exportable-name must be a class-name.
+
+       NOTE: It is expected that this feature will be generalized for other
+       constructs when the Extended Pascal standard is revised.
+
+6.11 Visibility. The visibility of entities defined within a class is
+controlled by the interaction between class views and the module interface
+facilities. These facilities provide a general mechanism for controlling
+name visibility to different categories of clients.
+
+An entity in the reference-type of a class can be accessed wherever the name
+of the class is visible. The name of a visible field, method, or destructor
+in a class can be accessed wherever a reference to an object of that class
+is visible. The name of a visible constructor can be accessed wherever the
+name of the class is visible. The visible entities of a class specify the
+interface for objects of that class to an importing scope.
+
+       NOTE: Parts of a class can be hidden from users by defining the class
+       in a module, defining a view of the class that does not include the
+       parts to be hidden, and exporting only the view from the module.
+
+6.12 Extended Pascal Features. The following features from Extended Pascal
+are used or implied by the object extensions. An implementation of classic
+Pascal would require enhancements in these areas as well as the object
+extensions to provide the complete set of capabilities specified in this
+report.
+
+       Initial State. The object extensions use the initial state
+       specification of Extended Pascal to specify the initial state of an
+       object.
+
+       Modules. In conjunction with class views, the module facility is used
+       to provide privacy. It is also used to provide renaming of class
+       entities when combining class libraries.
+
+       Membership Operator Precedence Level. The operator is has a higher
+       precedence level than the multiplying operators.
+
+6.13 Suggested Changes to Extended Pascal. The following features are
+recommended for inclusion in the next revision of the Extended Pascal
+standard.
+
+       *   Permit the repetition of a parameter specification for forwardly
+           declared procedures and functions, and for the specification of
+           procedure and function headings in the implementation parts of
+           modules.
+
+       *   Permit the renaming of record fields on export from a module.
+
+
+                                Appendix A
+                             Collected Syntax
+                             ----------------
+
+The following is the syntax for class definitions. Productions referenced
+but not defined here refer to those defined in the Extended Pascal standard.
+Productions marked with an asterisk are extensions to those in the Extended
+Pascal standard. All others are new.
+
+       abstract-class = "abstract" "class"
+                        class-definition-part .
+
+       actual-class-definition = [ class-inheritance ]
+                                 [ class-component-list ] .
+
+       ancestor-name = class-type-name .
+
+       class-component = class-field-item |
+                         class-procedural-item
+                         [ ";" ( override-directive |
+                                 "abstract" ) ] .
+
+       class-component-list = class-component
+                              { "," class-component } [ ";" ] .
+
+       class-definition-part = ( actual-class-definition |
+                                 deferred-class-definition )
+                               "end" .
+
+       class-field-item = variable-declaration .
+
+       class-field-specifier = field-specifier .
+
+       class-inheritance = "(" class-inheritance-list ")" .
+
+       class-inheritance-list = class-type-name
+                                { "," class-type-name } .
+
+       class-procedural-item = procedure-heading |
+                               function-heading |
+                               constructor-heading |
+                               destructor-heading .
+
+       class-type-denoter = subclass-denoter |
+                            class-view-denoter .
+       class-type-name = type-name .
+
+       class-view-denoter = "view" "of" view-base-type
+                            class-definition-part .
+
+       concrete-class = "class" class-definition-part .
+
+       constructor-access = class-type-name "."
+             constructor-identifier [ actual-parameter-list ] .
+
+       constructor-declaration = constructor-identification ";"
+                                 procedure-block .
+
+       constructor-heading = "constructor" identifier
+                             [ formal-parameter-list ] .
+
+       constructor-identification =
+               "constructor" [ class-type-name "." ]
+               constructor-identifier [ formal-parameter-list ]
+               [ ";" override-directive ] .
+
+       constructor-identifier = identifier .
+
+       constructor-statement =
+              ( "inherited" | ancestor-name "." )
+              constructor-identifier [ actual-parameter-list ] .
+
+       deferred-class-definition = ".." .
+
+       destructor-declaration = destructor-identification ";"
+                                procedure-block .
+
+       destructor-heading = "destructor" identifier
+                            [ formal-parameter-list ] .
+
+       destructor-identification =
+               "destructor" [ class-type-name "." ]
+               destructor-identifier [ formal-parameter-list ]
+               [ ";" override-directive ] .
+
+       destructor-identifier = identifier .
+
+       destructor-statement =
+             [ "inherited" [ self-reference "." ] |
+               object-reference "." |
+               ancestor-name "." ]
+             destructor-identifier [ actual-parameter-list ] .
+
+*      export-clause = ( exportable-name |
+                         export-renaming-clause )
+                       [ "[" exportable-feature-list "]" ] .
+
+       exportable-feature-list = exportable-feature-renaming
+                           [ "," exportable-feature-renaming ] .
+
+       exportable-feature-renaming = feature-name "=>"
+                                     identifier .
+
+*      factor = primary [ exponentiating-operator primary |
+                          "is" type-identifier ] .
+
+       feature-name = field-identifier | method-identifier |
+                constructor-identifier | destructor-identifier .
+
+*      field-designator = [ object-reference "." ]
+                                       class-field-specifier |
+                          record-variable "." field-specifier |
+                          field-designator-identifier .
+
+*      function-identification =
+               "function" [ class-type-name "." ]
+               function-identifier [ formal-parameter-list ]
+               [ result-variable-specification ]
+               [ ";" result-type ]
+               [ ";" override-directive ] .
+
+       method-activation =
+           [ "inherited" [ self-reference "." ] |
+             object-reference "." |
+             ancestor-name "." ]
+           method-identifier [ actual-parameter-list ] .
+
+       method-identifier = identifier .
+
+       object-reference = variable-access | function-access .
+
+       override-directive = directive .
+
+*      primary > variable-access | unsigned-constant |
+                 set-constructor | function-access |
+                 "(" expression ")" | "not" primary |
+                 constant-access | schema-discriminant |
+                 structured-value-constructor |
+                 discriminant-identifier |
+                 constructor-access .
+
+*      procedure-and-function-declaration-part =
+           { ( procedure-declaration |
+               function-declaration |
+               constructor-declaration |
+               destructor-declaration ) ";" } .
+
+*      procedure-identification =
+               "procedure" [ class-type-name "." ]
+               procedure-identifier [ formal-parameter-list ]
+               [ ";" override-directive ] .
+
+       property-class = "property" "class"
+                        class-definition-part .
+
+       reference-coercion = class-type-name
+                                       "(" variable-access ")" .
+
+       self-identifier = identifier .
+
+       self-reference = self-identifier .
+
+*      simple-statement = empty-statement |
+                          assignment-statement |
+                          procedure-statement |
+                          goto-statement |
+                          constructor-statement |
+                          destructor-statement .
+
+       subclass-denoter = property-class | abstract-class |
+                          concrete-class .
+
+*      type-definition = identifier "="
+                         ( type-denoter | class-type-denoter ) .
+
+*      variable-access = entire-variable | component-variable |
+                         identified-variable | buffer-variable |
+                         substring-variable |
+                         function-identified-variable |
+                         reference-coercion .
+
+       view-base-type = class-type-name .
+
+
+                                Appendix B
+           Non-Syntactic Changes to the Extended Pascal Standard
+           -----------------------------------------------------
+
+
+The following word symbols have been added:
+
+       abstract, class, constructor, destructor, inherited, is, property,
+       view
+
+The following directive has been added:
+
+       Override
+
+The following predefined function has been added:
+
+       Copy
+
+The following constant has been added:
+
+       Null
+
+The following types have been added:
+
+       Root, TextWritable
+
+The following implicit protected parameter exists in methods, constructors,
+and destructors:
+
+       Self
+
+
+                                Appendix C
+                             Separated Issues
+                             ----------------
+
+After consideration, it was decided that the following potential language
+features would not be included in the main body of this report. Most of
+these features do not relate directly to objects and would require
+considerable work before they could be included in a technical report or
+standard.
+
+There are no current plans to do further work in these features. This does
+not imply that these concepts are not useful or desirable.
+
+C.1 Generic Types. Although a very useful feature, generic types have been
+separated out because they are really a separate issue. Their implementation
+is also quite complicated compared to many other features. Their inclusion
+in the report might discourage people from implementing the essential object
+features.
+
+Although not included, implementors are encouraged to experiment with this
+feature because it is a natural extension to schemata and fits well with the
+object extensions described herein. It should be noted, however, that the
+investigation of generic types was not completed when the decision to omit
+them was made. There are many open areas.
+
+The thought behind generic types is that they should be provided as an
+extension to schemata, with types as well as values being used as
+discriminants. The formal type discriminants would be used as type names in
+declaring fields.
+
+The process for discrimination does not get much more involved than it is
+now. The added work comes from having undiscriminated schema parameters that
+provide generic routines for generic types.
+
+C.1.1 Type Discriminant Specifiers. To add types as a discriminant
+possibility, the syntax for discriminant-specifier would have to be
+extended. Here is one way this could be done:
+
+       discriminant-specification =
+           identifier-list ":" ( ordinal-type-name |
+                           "type" [ "(" type-name-list ")" ] ) .
+
+       type-name-list = type-name { "," type-name } .
+
+If the discriminant-specification contains a type-name-list, it would define
+one or more discriminant-type-names.
+
+This syntax is very general and would allow almost any of the proposed uses.
+The only concept it does not represent is a set of types where all of the
+types share a given property, i.e., all the types are class-types,
+ordinal-types, set-types, etc. To represent this, all possible types would
+have to be listed in such a case.
+
+This does not seem to be a problem. In fact, the syntax may already allow
+more things than are desirable. It would probably be desirable to place
+restrictions on discriminant-type-names and on the places in the syntax
+where they could appear.
+
+One such restriction would be that a discriminant-type-name could not be
+used as the type of a discriminated field of a variant part.
+
+There was some talk of restricting generic types to only be used with
+classes. This could easily be done by making semantic and syntactic
+restrictions. It would certainly make implementation of generic types much
+easier.
+
+It was mentioned that there may need to be some restrictions on the use of
+subrange types; however, none were specified.
+
+C.1.2 Discriminants. To use a generic type, a change in the syntax would be
+needed for an actual discriminant. The following syntactic change would
+allow this:
+
+       actual-discriminant-part =
+           "(" actual-discriminant
+               { "," actual-discriminant } ")" .
+
+       actual-discriminant = ( discriminant-value |
+                               discriminant-type ) .
+
+       discriminant-type = type-name .
+
+A discriminant-type would be one of the type-names, or a descendant of one
+of the type-names, specified in the type-name-list for the corresponding
+position in the formal-discriminant-part.
+
+C.1.3 Generic Classes. Generic types could be used to define generic
+classes. A generic class definition would allow generic methods,
+constructors, and destructors to be defined.
+
+The only operations allowed for an entity declared with a type that is
+defined using a discriminant-type-name would be those that are shared by all
+the types that can be used as the discriminant-type.
+
+Compilers could have to generate different versions of the methods,
+constructors, and destructors declared in a generic class depending on the
+actual types that are used with the schema.
+
+It would be an implementation issue as to how many methods, constructors,
+and destructors are generated for one that appears in a generic class
+definition. One could be generated for each use, one could be generated that
+covers every use, or something in between.
+
+C.1.4 Generic Subclass Definitions. A generic class could be used to define
+a generic subclass which is later discriminated into a real class
+definition.
+
+If a descendant of a generic type could be defined, each of the actual types
+represented by a discriminated use of this descendant would have a
+descendant relationship with the type represented by a discriminated use of
+the original generic type.
+
+C.1.5 Multiple Inheritance and Generic Subclass Definitions. Multiple
+inheritance of generic subclasses could be done. The discrimination lists
+could be concatenated in the textual order of the ancestors. A generic type
+could appear more than once in the ancestor list; however, when
+discriminated, each discriminant would select a different type from the type
+family.
+
+Joins would not be allowed.
+
+Discrimination of a generic type in the ancestor list could be allowed.
+
+C.2 Assertions. A type assertion facility that included pre- and
+post-conditions (similar to those found in the Eiffel language) was
+considered and not included. The following points were brought up on
+assertions:
+
+       *   Assertions, although a nice feature, are not a panacea;
+       *   There is a heavy cost if assertions are used; although, a
+           smart compiler can optimize some things;
+       *   Assertions really are tied in with exception handling and are
+           probably better addressed there;
+       *   Many useful assertions are not readily expressible; and
+       *   A general assertion capability would need to be investigated
+           before anything was done.
+
+C.3 Procedure Variables. Procedure variables are not directly related to the
+object extensions. Although classes through polymorphism provide some of the
+capabilities of procedure variables, the feature is more orthogonal than
+interrelated.
+
+It was noted that procedure variables provide some useful capabilities such
+as building dispatch tables. However, there is also a high cost in defining
+procedure types. There are also restrictions, brought about by local
+procedures, that must be taken care of.
+
+It was also questioned whether procedure variables really add much more
+capability to the object system than already present with procedure
+parameters.
+
+C.4 Default Parameters. Although default parameters can be useful, they are
+not directly related to object extensions; therefore, they will not be
+investigated for inclusion in the object report. During their discussion,
+the following things were noted:
+
+       *   Default parameters could easily be specified by a value clause on
+           a parameter definition. This is a natural extension to the use of
+           the value clause in Extended Pascal, and would not conflict with
+           existing code.
+
+       *   On a procedure or function call, the trailing arguments that
+           correspond to parameters with default specifications could be
+           omitted from the actual-parameter-list.
+
+       *   If a parameter was a variable parameter, either a global variable
+           would have to be specified as the default, or a temporary
+           variable would need to be created to hold the default value.
+
+       *   It would not be appropriate to use a state specification to
+           specify a variable that is to be used as a default parameter;
+           however, some other syntax could be invented.
+
+       *   Default values for procedure, function and method parameters need
+           to be addressed, even if to say they are disallowed.
+
+       *   Default value parameters make sense; however, having other
+           default parameters is breaking new ground.
+
+       *   If default parameters are allowed, you should be able to have
+           them in the middle as well as at the end. The absence of a
+           default parameter in the middle of an argument list could be
+           indicated by consecutive commas.
+
+       *   In the actual parameter list, something other than consecutive
+           commas could be used to indicate a default parameter.
+
+C.5 Set Extensions. Pascal sets could be extended to include collections.
+This would generalize sets to include sets of objects. This extension would
+include:
+
+       *   The definition of sets of objects by allowing
+
+                 SET OF type;
+
+       *   The iteration over objects in the FOR statement; (The iteration
+           variable would have to be of a class type rather than an ordinal
+           type.)
+
+       *   The dynamic creation of object sets; (This could probably be done
+           with the normal set constructor because the type of the objects
+           inside it would be known as well as the context in which it is
+           being used. The interaction of ancestors and descendants could be
+           a little tricky though.)
+
+       *   The use of the set operators on these sets; and
+
+       *   The use of equality comparison operators on these sets.
+
+The extension could be implemented in many ways. What would be best would
+depend on the anticipated use. It was felt that the extension was a special
+case, it does not solve a general problem, and that the facility can be
+built into the class structure. There are also semantic and implementation
+questions that remain unanswered.
+
+C.6 Overloading Methods. Overloading occurs when two (or more) methods,
+procedures, or functions have the same name but different parameter lists.
+For an overloaded method, selection of the actual method to be invoked is
+based on matching of the types of the actual arguments against the types of
+the formal parameters.
+
+Because overloading is not provided, a programmer must use different
+function and procedure names to achieve the same effect.
+
+Overloaded methods have a logical clash with default parameters when a
+parameter is omitted and that parameter is needed to determine which
+overloaded method to use.
+
+Overloading has a problem when an object of a descendant class is used as an
+actual parameter and there are two overloaded methods that have different
+ancestor types for that parameter position. There is ambiguity as to which
+should be called.
+
+If overloading would have been done for methods, it would also have made
+sense to do it for procedures and functions.
+
+C.7 Persistent Objects. Persistent objects are objects that have an
+existence that is longer than the execution of the program that created
+them.
+
+For persistent objects to exist, their definitions must also be persistent.
+
+There are many ways such objects could be specified. For example, they could
+be specified by a property that is
+
+       *   Inherited;
+       *   Bestowed on creation;
+       *   Bestowed after creation;
+       *   Received from another object it is connected to; etc.
+
+The concept is orthogonal to the rest of the object work.
+
+C.8 Object Evolution. This is the ability of an object to change its type
+over time but still retain its unique identity, e.g., to become a more
+specialized object in the hierarchy as more is known about it.
+
+This is a relatively new concept not found in many programming languages.
+
+C.9 Object Roles. This is the ability of an object to assume different roles
+throughout its lifetime. This is much like having multi-active variants. An
+object may have more than one role at a given time. It is much like being in
+more than one place in the hierarchy at the same time, and these roles can
+change over time.
+
+This concept is found in some database areas, but is not found in
+programming languages.
+
+C.10 Access Abstraction. This is an encapsulation and abstraction
+methodology. Basically, it is an access that returns a reference. An example
+is a substring variable.
+
+It was thought that methods provide most of the capability of access
+abstraction.
+
+C.11 Operator Overloading. This is the ability to define new operations for
+existing operator names.
+
+Although a useful feature, it is not directly related to, or needed for, the
+object extensions.
+
+C.12 Operator Definition. This is the ability to define new operator names
+and to define their operations.
+
+Although a useful feature, it is not directly related to, or needed for, the
+object extensions.
+
+
+                                Appendix D
+                 Language Features Considered and Rejected
+                 -----------------------------------------
+
+D.1 Record Extensions. The committee considered extending records and having
+an underlying storage model similar to that used in C++. This model is known
+as the value model.
+
+The committee also considered having two storage models, one that followed
+the more classic object languages (Smalltalk and Object Pascal), and another
+that followed the C++ value model.
+
+After considerable thought and detailed proposals, both of these
+alternatives were rejected in favor of having only one model, the simpler
+and more classic reference model of Smalltalk and Object Pascal.
+
+The value model has many disadvantages, including:
+
+       *   The absence of object identity;
+
+       *   The absence of complete polymorphism, which is provided only via
+           pointers and reference parameters;
+
+       *   An increased dependency between modules; (Modules that have
+           allocated static records, or that use the size of a record for
+           allocating storage on the stack, need to be recompiled if the
+           size of the record changes.)
+
+       *   A more complex model with many nuances involving constructors,
+           destructors, and value parameters; (Therefore, making it harder
+           to teach and understand.)
+
+       *   An invalidation of all existing Object Pascal programs;
+           (Although, tools could be produced to ease the conversion.)
+
+       *   A requirement to specify conceptually unnecessary dereferencing;
+           and * Complete compatibility with C++ is not achieved.
+
+Using both models for objects would have:
+
+       *   Considerably complicated the language in definition,
+           implementation, and learning of the language.
+
+       *   Encouraged people to write in a non-object fashion, where they
+           would lose many of the benefits of the object paradigm. Having
+           one model encourages people to learn it and use it correctly.
+
+The main reasons for rejecting the value model and extended records were
+that there was not a compelling enough reason to have them and the benefits
+of efficiency and compatibility with C++ did not outweigh the intrinsic
+disadvantages. It should also be noted that efficiency and compatibility are
+highly implementation dependent and a standard has little control over them.
+
+It was also thought that a simpler language with only one model would be
+more successful in the marketplace than one that contains both models.
+Language committees have always been criticized about putting in too many
+features to appease everyone on the committee.
+
+D.2 Method Parameters. This is an extension to parameter variables that
+would permit the passing of methods as parameters.
+
+Although it seemed a natural extension, the committee did not find good
+examples for its use that could not be done in other natural ways.
+
+It was thought that this extension would add another complication that would
+rarely be used. The passing of self and procedure parameters can do most of
+the things that they would be used for.
+
+If methods were to be allowed to be passed as parameters, this could be done
+by extending the formal parameter specification for procedures and functions
+to include an indication of the class of a method.
+
+Method parameters would have permitted the construction of iteration
+procedures and other constructs. However, it is somewhat restricted because
+the methods must all be in the same class and have the same signature. Also,
+method parameters are not associated with a local scope and are therefore
+intrinsically less useful than procedure parameters.
+
+Having both kinds of parameters with different semantics would complicate
+the programming model. The semantics of method parameters differ from those
+of procedure parameters because method parameters do not pass a local scope.
+
+D.3 Specialization of Fields. An inherited field could be further
+specialized by respecifying an initial state. This could be done whether or
+not the original definition of the field specified an initial state. The
+type of the original field, however, could not be changed, not even to a
+descendant type of this field.
+
+To change the type of a field would:
+
+       *   Be adding new restrictions to a parent class; and
+
+       *   Create considerable overhead because assignment at a higher level
+           could be illegal and this might not be known until after
+           processing of a descendant class.
+
+
+Although restricted specialization of fields could have been specified in
+the report, it was not because it was thought to be too special a case, and
+the user already has the ability to override an initial value by use of a
+constructor.
+
+D.4 Non-Overridable Methods. This is the ability to state that a method
+cannot be overridden in a descendant.
+
+Although the feature goes against the beliefs of many software engineers, it
+does have some useful properties. For example, such a method would be more
+efficient to reference because it could be bound at compile time. Its use
+could reduce method table sizes, but a smart linker could do a better job.
+
+D.5 Embedded Objects. Embedded objects, where one object can be stuck inside
+of another were considered and rejected. This was done because there does
+not appear to be any significant advantage over using multiple inheritance
+or having an instance variable for the object. Therefore, it would
+unnecessarily complicate the report with little or no return.
+
+D.6 Field Selectors. There was some talk of having a feature similar to
+selecting methods which would instead select fields of a class through a
+parameter specification. This concept seemed to be going against
+encapsulation, and therefore was rejected.
+
+D.7 Run-Time Message Parameters. This is a facility for evaluating a
+symbolic message at run time, such as the Smalltalk PERFORM. It will not be
+provided because:
+
+       *   It would need considerable run-time checks;
+       *   Its power is easily abused;
+       *   Its properties are unknown when reading the code;
+       *   It is similar in many ways to an assigned goto;
+       *   It prohibits purging a class library of old code because the code
+           may still be dynamically referenced; and
+       *   It means that the complete class library must be available at run
+           time.
+
+D.8 Constant Objects. Although constant objects appear in the real world,
+and there would have been some value in having them, they were rejected
+because it was decided that their cost did not justify their benefits.
+
+The main points that led to this conclusion are:
+
+       *   There is no clear way that constant objects naturally fit
+           into the language and still model the real world.
+       *   Constant objects add another level of complexity that must
+           be taught.
+       *   Constant objects really imply a set of restrictions that
+           are equivalent to assertions.  A general assertion
+           mechanism would be a better way to address this.
+       *   Constant objects imply considerable run-time checks that
+           could be quite expensive.
+       *   There would need to be considerably extra syntax for
+           specifying constant objects.  This includes specifying what
+           methods can access them and specifying what operations can
+           be done on them.
+       *   Constant objects imply a set of restrictions that are
+           equivalent to creating a subclass and indicating that some
+           fields in this new subclass cannot be changed.  The
+           definition of such a subclass is equivalent to changing the
+           interface of a parent.
+       *   Constant objects are really read-only objects and are similar to
+           PROTECTED variables in Extended Pascal.
+       *   Constant objects do not improve efficiency or add new
+           functionality other than a restricted form of assertions.
+       *   It is not clear what restrictions would be placed on
+           constant objects, e.g., would it be necessary to define
+           values for all fields?  And, would it be possible to
+           reference non-constant objects in a constant object? *   It
+           is also not clear how constant objects should best be
+           created, i.e., at compile time, upon creation at run time,
+           or at some point later in their life.
+      *    With existing facilities, a programmer can simulate much of
+           the functionality of constant objects.
+
+D.9 Private Base Classes. Private base classes, as in C++, will not be
+provided. The general capabilities provided by private base classes are
+already available with class views. Although there are a few differences in
+the implementation, none is significant enough to justify the added
+complexity.
+
+D.10 Virtual Base Classes. Virtual base classes, as in C++, which permit the
+sharing of a single copy of a common ancestor's fields, will not be
+supported. This decision was made because:
+
+       *   Virtual base classes need to be declared by omniscient
+           designers rather than by the users of the classes;
+       *   The effect of virtual base classes can be obtain by
+           restructuring the class lattice and turning the common
+           ancestors into classes that will be mixed in with the other
+           parts of the object; and
+       *   All known implementations of virtual base classes are
+           inefficient in both time and space.
+
+D.11 Friends. There will not be a friend capability as is found in C++.
+
+Although there are some valid uses for friends, a friend type of interface
+is not being provided because it circumvents encapsulation and is believed
+to lead to poor programming practices.
+
+The functionality of friends is provided in a more secure manner by class
+views and the user's ability to export multiple interfaces from a module.
+
+D.12 Virtual Method Indication. Indication that a method can be overridden
+(e.g., C++ virtual) will not be required in the definition of a method. Any
+visible method can be overridden in a descendant class. A requirement to
+specify that a method can be overridden thwarts specialization and code
+refinement. It also requires an omniscient designer who anticipates future
+use; or, it requires the user must have access to the underlying code so
+that it can be changed. Both of these are poor assumptions.
+
+D.13 Class Implementation Part. There will not be an explicit class
+implementation part.
+
+The reasons for this are that:
+
+       *   The modularity feature can provide all the grouping
+           capabilities that are needed.
+       *   Having methods grouped in a separate section provides less
+           flexibility for loading, replacing, and organizing methods.
+       *   If the implementation part contained the specification of
+           private parts, two places would need to be looked at to
+           determine the size of objects in this class.
+
+On the positive side, a class implementation part would have:
+
+       *   Not required the class name to be specified with the
+           definition for each method;
+       *   Permitted methods to be grouped together for the class they
+           work with, thereby making it easier to find all the methods
+           declared in a class; and
+       *   Provided a place where private parts could be declared and
+           have them more hidden.
+
+D.14 Packed Objects. Packed objects will not be provided. No good reason for
+allowing this could be found. There was also no desire to extend a feature
+that many people think should be deprecated.
+
+
+                                Appendix E
+             Rationale for Decisions Reflected in this Report
+             ------------------------------------------------
+
+This appendix contains rationale that was captured during the development of
+this report. It is by no means complete or exhaustive.
+
+The section numbers and titles are those of the main body of the text to
+which the rationale apply.
+
+E.6.1.1 Extension of the Type System. Class definitions are part of the type
+system so that the capabilities will be consistent with, and similar to,
+existing Pascal facilities and will mirror similar capabilities in other
+languages. It was felt that classes fit best with, and are conceptually
+closer to, things in the type system than other things in the language.
+
+An alternative would have been to try to make classes more closely resemble
+modules.
+
+Class definitions are determinable at compile time rather than run time to
+permit static type checking wherever possible and to match the existing
+Pascal model. It also closely matches other languages such as Eiffel,
+Trellis, and C++.
+
+E.6.1.2 Restrictions on Class Definitions. Class definitions can appear only
+at the program or module level because otherwise:
+
+       *   Objects could be created that could outlive the procedural
+           environment in which they are defined;
+       *   Due to upward assignment, references to such objects can
+           escape the area in which the class is defined;
+       *   A method within such a class could access procedure and
+           parameter data that may not exist at the time the method is
+           activated;
+       *   Although access to local variables and procedures could be
+           restricted, this would remove the main reason for having
+           local classes;
+       *   A restriction on outward assignment in inadequate due to
+           intermediaries; and
+       *   It would require complete containment or checks to see that
+           a correct environment exists for each access.
+
+A class definition cannot be nested inside another class definition because:
+
+       *   Such a definition would have an anonymous name that could
+           not be used in the definitions of the bodies of methods,
+           constructors, or destructors;
+       *   Multiple nested classes would cause name reference
+           ambiguities that would require further extensions to resolve;
+       *   No good reason could be found to allow nesting; and
+       *   Such a capability would simply complicate definition,
+           implementation, and use.
+
+E.6.1.3 Contents and Syntax of Class Definitions. Use of the word class was
+thought to be more descriptive of the underlying definition of a class of
+objects than the word object, which is presently used in all implementations
+of Object Pascal. The word class is also more like set, and object is more
+like record. This rationale is not the same as that used to make the change
+from class in Clascal to object in Object Pascal. However, the word class is
+now more common in the industry than it was when Object Pascal was created.
+
+E.6.1.3.2 Inheritance List. Each ancestor class can be listed only once
+because of Pascal's normal scope rules. It is the same as not allowing two
+parameters with the same name. It is also because a class cannot have
+multiple common ancestors.
+
+Although single inheritance can handle over 90% of the cases where
+inheritance is needed, some form of multiple inheritance was still
+considered to be essential. Multiple inheritance is a natural and frequently
+used mechanism for modeling objects and concepts in the real world. Having
+it directly supported in the language makes modeling easier. Interfaces from
+each of the parents are better preserved and more easily expressed with
+multiple inheritance than with having separate instance variables for each
+of the parents.
+
+E.6.1.3.5 Constructors. Alternatives considered for specifying constructors
+include:
+
+       *   Having a predefined function (e.g. Construct) that would
+           take as a parameter the class name and a constructor name,
+           if one was specified.
+       *   Having a new second parameter to New that would specify the
+           class name and constructor.
+
+The purpose of a user-defined constructor is to make sure that when an
+object is created that it is in a stable state. Some or all of this may be
+possible by specifying initial states for fields in an object. For cases
+where this cannot be completely specified statically, a constructor can be
+used to set fields dynamically.
+
+E.6.1.3.6 Destructors. Alternatives considered for specifying destructors
+include:
+
+       *   Having a predefined procedure that would destroy objects.
+           (This has the advantage of having only one name for
+           destroying an object.)
+       *   Having only one destructor for a class, without parameters,
+           that is implicitly called when an object goes out of
+           existence.  (This has the advantage that the system would
+           take care of finding objects that need to be destroyed.
+           Such a destructor could have called other, helper destructors.)
+
+The form of destructor chosen seemed to be more generally useful.
+
+E.6.2.2 Abstract Classes. Abstract classes are included because experience
+has shown that they are a natural and beneficial tool for specifying
+structure. Without them, programmers have to simulate this facility without
+compile-time checking.
+
+E.6.2.3 Property Classes. Property classes have been added to the regular
+class definition mechanism rather than having a separate definition
+mechanism for them. This is because they have many similarities with regular
+classes.
+
+E.6.2.5 Class Viewing. Class views provide a general, user-controlled
+mechanism for specifying arbitrary levels of privacy to multiple users. They
+are provided in place of the more common and restrictive forms of privacy
+(i.e. public, private, and protected parts) found in Eiffel, C++, and other
+languages.
+
+E.6.3.3 Name Conflicts. The renaming of inherited entities at the point of
+introduction into a class was considered. Although this would have provided
+a means for removing name conflicts that occur in multiple inheritance, it
+was rejected because it changes the interface between a descendant and its
+ancestor. Therefore, the descendant would not be a subtype of its ancestor.
+
+If users do not have access to the class definitions that cause the
+conflict, they can define adapter modules that change the conflicting names
+in a consistent way for use throughout the program.
+
+E.6.3.4 Overriding. An explicit indication of overriding was considered
+beneficial both to avoid accidental errors and to state explicitly the
+intent of the programmer.
+
+The main reason for permitting the respecification of the parameter list is
+to improve readability. It is believed that the increased readability
+outweighs possible misuse.
+
+If parameter refinement were allowed, it would change the interface defined
+by a parent.
+
+No benefit could be seen for allowing an overriding method to define a
+parameter to be either an ancestor type or a descendant type of the original
+parameter. Also, extra rules would be needed to allow it.
+
+Although there would not be a problem in allowing the changing of the type
+of a function result, the extra work of defining the exception, and teaching
+it, did not seem to be justified by its potential use.
+
+E.6.3.5 Abstract Methods, Constructors, and Destructors. Abstract is
+explicitly stated for documentation and checking purposes.
+
+This requirement catches the addition of a method in a parent class that has
+the same name as an abstract method in a descendant.
+
+E.6.5.1 The Object Model. The reference model has the following advantages:
+
+       *   It preserves object identity;
+       *   It preserves polymorphism;
+       *   There is more independence between modules because they are not as
+           dependent on object sizes;  Therefore, they do not need to
+           be recompiled as often when objects change.
+       *   It is a simple model that is easy to teach;
+       *   It conforms to the existing model for Object Pascal;
+       *   Existing Object Pascal programs could be converted to it
+           with little trouble by the use of automated tools; and,
+       *   Conceptually unnecessary dereferencing is not required.
+
+The reference model has the following disadvantages:
+
+       *   It provides limited compatibility and interoperation with
+           C++ programs and libraries;
+       *   It does not provide for programmer-specified static- and
+           stack-based objects; (Note, however, that an implementation
+           could place objects in static or stack storage if this is
+           compatible with their usage in the program.)
+       *   Objects and records are handled in dissimilar ways so
+           existing Pascal programs are not as easily converted in an
+           incremental fashion to an object methodology;
+       *   It is slightly less efficient at run-time because of extra
+           dereferencing;
+       *   There is less programmer control of the underlying object
+           representation; and
+       *   It does not provides a clear indication of the underlying
+           dereferencing that is going on.
+
+E.6.5.4 Implicit References. The name of an ancestor other than a direct
+parent can be used because it does not break encapsulation and it requires
+no more knowledge than the use of inherited fields and methods.
+
+E.6.5.6 Inherited. It was decided to have inherited as a prefix to a method
+access rather than have an implicit identifier like self that could have
+been used with name qualification. This was done to avoid constructs such as
+
+           INHERITED . INHERITED
+       and
+           WITH INHERITED DO
+
+There is some awkwardness in having it as a prefix when it is used with a
+function. For example:
+
+       A + INHERITED Size
+
+However, this was considered acceptable.
+
+Inherited is not essential because a parent name with qualification could be
+used instead.
+
+However, it was thought that having inherited can make it easier to update a
+class hierarchy because implementation parts do not need to be checked for
+the use of the construct
+
+       parent-name . method-name
+
+E.6.5.7 Reference Type Coercion. Object coercion is provided because
+practical experience has shown that it is useful and desirable to have this
+capability. A functional notation was chosen because it is easily readable
+and many existing Pascal implementations use this notation for this
+operation. Alternatives considered include:
+
+       *   Use of a new operator, such as "::";  (This specific
+           operator had the disadvantage of being the same as a C++
+           operator, but performing a different operation.  Also, new
+           operators in general seem to be more cryptic and therefore
+           less desirable.)
+       *   Use of a function, such as view;  (This had the
+           disadvantage that a function implies a conversion, and a
+           type would have to be "passed" as a parameter.)
+       *   Use of "." for going down as well as up the hierarchy.
+           (This has the disadvantage that it does not clearly show
+           that an error can occur.)
+
+E.6.5.8.4 Activation of Destructors. The order of destructor calls is
+controlled by the user because an implementation-defined order would not
+always be correct.
+
+E.6.5.8.7.2 Variable Parameters. An alternative would have been to allow a
+descendant of the formal type, but this would cause a problem because a more
+general type could be returned.
+
+E.6.5.8.8 Membership Operator Is. The is functionality cannot easily be
+defined by a user because one of the operands is a type name and not an
+expression.
+
+There should be no problem in implementing this function because the
+underlying test will be needed for other features, e.g., the test on viewing
+(unless the error for incorrect viewing is not caught by an implementation).
+
+Although the is operator could be misused, it was felt that this misuse is
+outweighed by correct usage. Its main use is seen to be with an object that
+is in a general container and sending this object a specific message based
+on its true type. This need is a consequence of having strong type checking
+at compile time.
+
+Eiffel and Object Pascal have this feature but in a different form.
+
+The only real cost for having this feature is a few extra bytes associated
+with each class definition, which is contained in the class tables at run
+time.
+
+Alternative ways to supply this functionality that were considered and
+rejected include:
+
+       *   A function such as Member that takes an object and a type as
+           arguments and returns a Boolean value. This has the advantage
+           that this form is used in Object Pascal, but has the disadvantage
+           that a type name is not a normal argument type.
+
+       *   A function associated with a class, e.g.,
+
+              T_Circle . IS ( object )
+
+           This had the advantage that the format was already in the
+           language.
+
+       *   Use of the IN operator, e.g.,
+
+              object IN class-name
+
+           This form would emphasize the set properties of an object, a view
+           that does not have general agreement.
+
+       *   A special form of method associated with all classes, e.g.,
+
+              object . IS ( class-name )
+
+           Here again, the parameter is a type name.
+
+       *   Another alternative would have been to provide a function that
+           returns a unique tag indicating the class type. This could have
+           been used in a case statement.
+
+E.6.6 Predefined Entities. Identifiers are used, rather than word symbols,
+in order to minimize conflicts with existing Pascal programs.
+
+E.6.6.1 Null. An alternative to having a separate value for classes would
+have been to further overload Nil. This was not done so as not to mislead
+the user into thinking that objects are implemented as pointers.
+
+E.6.6.2.3 Clone. The Clone facility is supplied as a method so it can be
+overridden. A general deep clone facility cannot be provided except by a
+user because its action depends on the semantics of the application. This
+can be seen by its interaction with constructors.
+
+E.6.6.2.4 Equal. Other comparison mechanisms that were considered include:
+
+       1.  Having a built-in function that can take arguments of any
+           type and compare them for equality.  This had the problem
+           that it breaks encapsulation.
+       2.  Having the user create a method or function for each
+           individual comparison that is desired.  This did not lead
+           to consistent naming and understanding of code.  Also, if
+           the semantic meaning was close to one of the built-in
+           operators, there would be a chance of error.
+       3.  Having magic function or method names that if present are
+           used as the underlying tests for comparison.  This had a
+           problem in that a special rule must always be remembered
+           even (and especially when) the feature was not used.
+       4.  Providing a means to directly specify the overloading of
+           the comparison operators (<, >, etc.).
+
+E.6.6.3 TextWritable. WriteObj and ReadObj are defined only for text files
+because Pascal does not have a generic file facility. Also, text files seem
+to offer the most portability among systems.
+
+E.6.6.4 Copy. Copy is provided because the user may not know the actual type
+of an object or have access to all fields of an object. A user would not be
+able to write Copy if it uses system information that is not available. It
+is provided as a function because such functionality is normally put into
+functions.
+
+E.6.10 Changes to Export Clause. Renaming is provided so that otherwise
+conflicting class libraries can be used in a program. It is done only on
+module exportation to provide better control over this potentially dangerous
+feature. Without that control, renaming can easily lead to confusion.
+
+---------------------------------------------------- End of Text ---------
+

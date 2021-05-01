@@ -1,0 +1,50 @@
+Tokens:
+
+identifier
+number 123 0777 0xabcd 0b1010
+float
+//
+/
+/* */
+/=
+'c'
+"str"
+=
+==
++
+++
++=
+-
+--
+-=
+!
+!=
+<
+<=
+<<
+>
+>=
+>>
+|
+||
+|=
+&
+&&
+&=
+^
+^=
+%
+*
+*=
+[ ]
+? :
+~
+;
+{ }
+( )
+,
+:
+
+Special:
+
+'#' as the first non-whitespace character.
