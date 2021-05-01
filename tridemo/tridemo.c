@@ -6,11 +6,11 @@
 #include "jdm_utilgl.h"
 
 #if USE_GLES2
-JDM_EMBED_FILE(fragment_source, "basic-es2.frag");
-JDM_EMBED_FILE(vertex_source, "basic-es2.vert");
+JDM_EMBED_FILE(fragment_source, "tridemo/basic-es2.frag");
+JDM_EMBED_FILE(vertex_source, "tridemo/basic-es2.vert");
 #else
-JDM_EMBED_FILE(fragment_source, "basic.frag");
-JDM_EMBED_FILE(vertex_source, "basic.vert");
+JDM_EMBED_FILE(fragment_source, "tridemo/basic.frag");
+JDM_EMBED_FILE(vertex_source, "tridemo/basic.vert");
 #endif
 
 static GLuint my_shader_program;

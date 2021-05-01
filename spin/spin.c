@@ -9,11 +9,11 @@
 #include "jdm_vectors.h"
 
 #if USE_GLES2
-JDM_EMBED_FILE(fragment_source, "flat-es2.frag");
-JDM_EMBED_FILE(vertex_source, "flat-es2.vert");
+JDM_EMBED_FILE(fragment_source, "spin/flat-es2.frag");
+JDM_EMBED_FILE(vertex_source, "spin/flat-es2.vert");
 #else
-JDM_EMBED_FILE(fragment_source, "flat.frag");
-JDM_EMBED_FILE(vertex_source, "flat.vert");
+JDM_EMBED_FILE(fragment_source, "spin/flat.frag");
+JDM_EMBED_FILE(vertex_source, "spin/flat.vert");
 #endif
 
 /******************************************************************************/

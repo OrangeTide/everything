@@ -38,8 +38,8 @@ static GLint projection_loc;
 /* Shaders */
 /******************************************************************************/
 
-JDM_EMBED_FILE(textmode_fragment_source, "textmode.frag");
-JDM_EMBED_FILE(textmode_vertex_source, "textmode.vert");
+JDM_EMBED_FILE(textmode_fragment_source, "rpg/textmode.frag");
+JDM_EMBED_FILE(textmode_vertex_source, "rpg/textmode.vert");
 
 static GLuint
 textmode_shader_load(void)
