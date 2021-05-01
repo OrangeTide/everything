@@ -71,6 +71,11 @@
 #if defined(__WIN32__)
 # define JDM_EMBED_ASM_TYPE(identifier) /* do nothing */
 # define JDM_EMBED_ASM_SIZE(identifier) /* do nothing */
+#elif defined(__arm__)
+# define JDM_EMBED_ASM_TYPE(identifier) \
+	".type\t" JDM_EMBED_ASM_SYM(identifier,) ", %object"
+# define JDM_EMBED_ASM_SIZE(identifier) \
+	".size\t" JDM_EMBED_ASM_SYM(identifier,) ", . - " JDM_EMBED_ASM_SYM(identifier,)
 #else
 # define JDM_EMBED_ASM_TYPE(identifier) \
 	".type\t" JDM_EMBED_ASM_SYM(identifier,) ", @object"

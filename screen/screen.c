@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/select.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <term.h>
 

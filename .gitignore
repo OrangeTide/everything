@@ -10,22 +10,3 @@
 *.lib
 *.dll
 *.res
-
-# executables
-ansiview
-bbs
-expr
-font2c
-gamepad
-gui01
-invader
-retro
-rpg
-shuffle
-spin
-test_cgatext
-test_embed
-test_notifier
-test_terminal
-tile
-tridemo

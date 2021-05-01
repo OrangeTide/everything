@@ -1,6 +1,7 @@
 /* vim: set noet sw=4 sts=4 ts=4 tw=80: */
 #define _GNU_SOURCE	/* for NI_MAXSERV and NI_MAXHOST */
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

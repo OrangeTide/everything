@@ -1,3 +1,4 @@
+gui01.CPPFLAGS = -Inotifier
 gui01.SRCS = gui01.c
 ifeq ($(OS),Windows_NT)
 	gui01.PKGS = gdi32

@@ -1,1 +1,0 @@
-TARGETS += test_embed

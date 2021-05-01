@@ -97,8 +97,17 @@ HAS_SDL := 0
 endif
 endif
 
-# include all targets
-include $(wildcard *.mk)
+# include all targets in subdirectories
+define load-project
+SUBDIR:=$(dir $1)
+NAME:=$(basename $(notdir $1))
+$$(NAME).DIR := $(dir $1)
+include $1
+$$(NAME).SRCS := $$(patsubst %,$$(SUBDIR)%,$$($$(NAME).SRCS))
+undefine SUBDIR
+undefine NAME
+endef
+$(foreach f,$(wildcard */*.mk),$(eval $(call load-project,$f)))
 
 ##
 
@@ -125,11 +134,11 @@ endef
 # generates rules for one target. currently does .c to executable without intermediate .o
 define gen-target
 $(info Generating rules for $1 ... $($1.EXEC) : $($1.SRCS))
-$($1.EXEC) : $($1.SRCS)
-	$(CC) -o $$@ $$^ $($1.CFLAGS) $(if $($1.PKGS),$(call pkg-config-cflags,$($1.PKGS))) $($1.LDFLAGS) $(if $($1.PKGS),$(call pkg-config-libs,$($1.PKGS)))
-all :: $($1.EXEC)
+$($1.DIR)$($1.EXEC) : $($1.SRCS)
+	$(CC) -o $$@ $$^ $($1.CFLAGS) -I. -I$($1.DIR) $($1.CPPFLAGS) $(if $($1.PKGS),$(call pkg-config-cflags,$($1.PKGS))) $($1.LDFLAGS) $(if $($1.PKGS),$(call pkg-config-libs,$($1.PKGS)))
+all :: $($1.DIR)$($1.EXEC)
 clean ::
-	$(RM) $$($1.EXEC) $$($1.OBJS)
+	$(RM) $$($1.DIR)$$($1.EXEC) $$($1.OBJS)
 endef
 
 ifeq ($(OS),Windows_NT)
