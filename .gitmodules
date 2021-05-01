@@ -1,0 +1,6 @@
+[submodule "WIP/webmud/--depth"]
+	path = WIP/webmud/--depth
+	url = git://github.com/civetweb/civetweb
+[submodule "WIP/webmud/civetweb"]
+	path = WIP/webmud/civetweb
+	url = git://github.com/civetweb/civetweb

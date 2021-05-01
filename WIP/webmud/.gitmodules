@@ -1,0 +1,4 @@
+[submodule "civetweb"]
+	path = civetweb
+	url = https://github.com/civetweb/civetweb
+	branch = master
