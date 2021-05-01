@@ -182,7 +182,7 @@ terminal_open(void)
 
 	setlocale(LC_ALL, "");
 	int e;
-	if (setupterm(NULL, STDOUT_FILENO, &e) != 0)
+	if (setupterm(NULL, STDOUT_FILENO, &e) != OK)
 		return -1;
 
 	struct termios raw_mode;
