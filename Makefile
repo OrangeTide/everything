@@ -10,8 +10,15 @@ endif
 ifeq ($(OS),Windows_NT)
 	X = .exe
 	CFLAGS += -mwindows
+ifeq ($(MINGW_CHOST),)
 	pkg-config-cflags = $(foreach pkg,$(1),$$(PKGCFLAGS.$(pkg)))
 	pkg-config-libs = $(foreach pkg,$(1),$$(PKGLIBS.$(pkg)))
+else
+	# first look up packages through PKGCFLAGS/PKGLIBS.
+	# if not found, then fall back to pkg-config.
+	pkg-config-cflags = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGCFLAGS.$(pkg)),$$(shell pkg-config --cflags $(pkg))))
+	pkg-config-libs = $(foreach pkg,$(1),$$(if $$(PKGCFLAGS.$(pkg))$$(PKGLIBS.$(pkg)),$$(PKGLIBS.$(pkg)),$$(shell pkg-config --libs $(pkg))))
+endif
 	CFLAGS = -mwindows -Wall -W -Os -ggdb
 ifeq ($(HOSTOS),Linux)
 	# based on my own cross-compile setup
@@ -64,12 +71,18 @@ ifeq ($(OS),Windows_NT)
 	# terminfo
 	PKGCFLAGS.tinfo =
 	PKGLIBS.tnfo = -ltinfo
+ifeq ($(MINGW_CHOST),)
 	# sdl2-static
 	PKGCFLAGS.sdl2-static = -IC:\TDM-GCC-64\x86_64-w64-mingw32\include\SDL2
 	PKGLIBS.sdl2-static = -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -Wl,-static -lSDL2main -lSDL2 -Wl,-Bdynamic -mwindows -Wl,--no-undefined -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -static-libgcc
 	# sdl2 (dynamic)
 	PKGCFLAGS.sdl2 = -IC:\TDM-GCC-64\x86_64-w64-mingw32\include\SDL2
 	PKGLIBS.sdl2 = -lmingw32 -lSDL2main -lSDL2
+else
+	# sdl2
+	PKGCFLAGS.sdl2 := $(shell pkg-config --cflags SDL2)
+	PKGLIBS.sdl2 := $(shell pkg-config --libs SDL2)
+endif
 else ifeq ($(OS),Linux)
 	# mintaro
 	PKGLIBS.mintaro = -lX11 -lXext -lasound -lpthread -lm
