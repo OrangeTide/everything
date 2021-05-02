@@ -1,0 +1,18 @@
+#include "resource.h"
+
+IDR_MYMENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "E&xit", IDM_EXIT
+    END
+
+    POPUP "&Tools"
+    BEGIN
+        MENUITEM "Text &Editor", IDM_NEW_EDITOR
+        MENUITEM "&Graphics View", IDM_NEW_GRAPHICS, GRAYED
+		MENUITEM "&Hex Editor", IDM_NEW_HEXEDIT, GRAYED
+    END
+END
+
+IDI_MYICON ICON "favicon.ico"
