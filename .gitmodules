@@ -4,3 +4,6 @@
 [submodule "WIP/webmud/civetweb"]
 	path = WIP/webmud/civetweb
 	url = git://github.com/civetweb/civetweb
+[submodule "fudge"]
+	path = fudge
+	url = ./fudge
